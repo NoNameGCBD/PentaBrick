@@ -31,6 +31,7 @@ namespace PentaBrick.View
         };
 
         private static readonly Color PanelColor = new Color32(0x24, 0x28, 0x31, 245);
+        private static readonly Color PageColor = new Color32(0x1a, 0x1d, 0x24, 255);
         private static readonly Color CardColor = new Color32(0x2e, 0x33, 0x3e, 255);
         private static readonly Color LineColor = new Color32(0x4a, 0x50, 0x5e, 255);
         private static readonly Color TextColor = new Color32(0xe8, 0xea, 0xee, 255);
@@ -52,6 +53,15 @@ namespace PentaBrick.View
         private bool menuOpen;     // Esc 메뉴
         private bool settingsOpen; // Esc 메뉴 안의 설정
         private bool quitOpen;     // 메인 화면의 게임 종료 확인 창
+
+        // 전환 애니메이션. Build()가 매번 화면을 새로 만들므로 시작 시각만 기억하고 Update에서 시간으로 계산한다.
+        private const float ScreenFade = 0.3f, ModalPop = 0.18f; // 초
+        private UiScreen? builtScreen;
+        private float screenStart = -10f;
+        private VisualElement screenCover; // 화면이 바뀔 때 새 화면 위에서 서서히 걷히는 막
+        private string builtModal;
+        private float modalStart = -10f;
+        private VisualElement modalOverlay, modalBox;
         private const string VolumeKey = "volume";
         public const string TutorialSeenKey = "tutorialSeen"; // 튜토리얼을 하거나 건너뛰었으면 첫 접속 안내를 다시 띄우지 않는다
         private Tutorial tutorial;      // null이 아니면 튜토리얼 진행 중
@@ -142,6 +152,9 @@ namespace PentaBrick.View
 
         /// <summary>게임 종료 확인 창이 떠 있는지.</summary>
         public bool IsQuitOpen => quitOpen;
+
+        /// <summary>화면 전환 애니메이션이 진행 중인지.</summary>
+        public bool IsTransitioning => Time.unscaledTime - screenStart < ScreenFade;
 
         /// <summary>게임 화면에서 창이 하나도 안 떠 있을 때만 3D 편집과 단축키를 받는다.</summary>
         private void RefreshInput() => editor.enabled = CurrentScreen == UiScreen.Game && !menuOpen && !IsConfirming;
@@ -353,6 +366,7 @@ namespace PentaBrick.View
                 dirty = false;
                 Build();
             }
+            else if (screenCover != null) Animate();
             if (CurrentScreen == UiScreen.Intro) UpdateIntro();
             if (CurrentScreen != UiScreen.Game) return;
             int seconds = (int)(state.ElapsedMs / 1000);
@@ -376,14 +390,48 @@ namespace PentaBrick.View
         private void Build()
         {
             root.Clear();
+            if (builtScreen != CurrentScreen)
+            {
+                if (builtScreen != null) screenStart = Time.unscaledTime; // 처음 뜨는 화면은 바로 보인다
+                builtScreen = CurrentScreen;
+            }
             if (CurrentScreen == UiScreen.Intro) BuildIntro();
             else if (CurrentScreen == UiScreen.Main) BuildMain();
             else if (CurrentScreen == UiScreen.DifficultySelect) BuildDifficultySelect();
             else BuildGame();
+
+            screenCover = new VisualElement { pickingMode = PickingMode.Ignore }; // 클릭은 통과시킨다
+            screenCover.style.position = Position.Absolute;
+            screenCover.style.left = screenCover.style.top = screenCover.style.right = screenCover.style.bottom = 0;
+            screenCover.style.backgroundColor = PageColor;
+            root.Add(screenCover);
+
+            modalOverlay = modalBox = null;
             if (menuOpen) BuildMenu();
             if (IsConfirming) BuildConfirm();
             if (askTutorial && CurrentScreen == UiScreen.Main) BuildTutorialPrompt();
             if (quitOpen && CurrentScreen == UiScreen.Main) BuildQuitConfirm();
+            // 새 창이 열렸을 때만 다시 튀어나오게 한다(같은 창이 다시 그려질 때는 이어서).
+            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : "menu";
+            if (modal != builtModal)
+            {
+                builtModal = modal;
+                modalStart = Time.unscaledTime;
+            }
+            Animate();
+        }
+
+        /// <summary>화면 전환(어두운 막이 걷힘)과 창 열기(서서히 나타나며 살짝 커짐)를 현재 시각에 맞춰 그린다.</summary>
+        private void Animate()
+        {
+            float now = Time.unscaledTime;
+            float s = Mathf.SmoothStep(0f, 1f, (now - screenStart) / ScreenFade);
+            screenCover.style.opacity = 1f - s;
+            screenCover.style.display = s >= 1f ? DisplayStyle.None : DisplayStyle.Flex;
+            if (modalOverlay == null) return;
+            float m = Mathf.SmoothStep(0f, 1f, (now - modalStart) / ModalPop);
+            modalOverlay.style.opacity = m;
+            modalBox.style.scale = new Scale(Vector2.one * (0.94f + 0.06f * m));
         }
 
         /// <summary>첫 접속 때 튜토리얼을 할지 묻는 창.</summary>
@@ -456,6 +504,8 @@ namespace PentaBrick.View
             box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 20;
             Border(box, LineColor, 1);
             overlay.Add(box);
+            modalOverlay = overlay;
+            modalBox = box;
             return box;
         }
 
@@ -828,7 +878,7 @@ namespace PentaBrick.View
         {
             var page = new VisualElement();
             page.style.flexGrow = 1;
-            page.style.backgroundColor = (Color)new Color32(0x1a, 0x1d, 0x24, 255);
+            page.style.backgroundColor = PageColor;
             page.style.alignItems = Align.Center;
             page.style.justifyContent = Justify.Center;
             root.Add(page);

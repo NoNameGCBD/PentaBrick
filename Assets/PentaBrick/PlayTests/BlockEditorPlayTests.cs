@@ -206,6 +206,22 @@ namespace PentaBrick.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator 화면이_바뀌면_전환_애니메이션이_재생되고_그동안에도_클릭할_수_있다()
+        {
+            yield return Click("게임 시작");
+            Assert.AreEqual(UiScreen.DifficultySelect, ui.CurrentScreen);
+            Assert.IsTrue(ui.IsTransitioning);
+            yield return Save("ui-transition.png");
+
+            // 전환 중에 덮인 막이 클릭을 막지 않는다.
+            yield return Click("← 메인으로");
+            Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
+
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.IsFalse(ui.IsTransitioning);
+        }
+
+        [UnityTest]
         public IEnumerator 메인_화면에서_Esc를_누르면_종료_확인_창을_띄운다()
         {
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
