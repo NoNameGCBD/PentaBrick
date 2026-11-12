@@ -47,6 +47,8 @@ namespace PentaBrick.Game
         /// <summary>결과 화면에서: 이번 문제로 실제로 바뀐 점수(연습이면 0).</summary>
         public int LastDelta { get; private set; }
         public bool ShowingAnswer { get; private set; }
+        /// <summary>문제를 새로 시작할 때마다 1씩 는다(같은 문제를 다시 열어도). 효과음이 새 문제를 알아보는 데 쓴다.</summary>
+        public int PuzzleSerial { get; private set; }
 
         public event Action Changed;
 
@@ -133,6 +135,7 @@ namespace PentaBrick.Game
             Unscored = ShowMine || IsCustom;
             TimeBonus = LastDelta = 0;
             startedAt = nowMs();
+            PuzzleSerial++;
             Changed?.Invoke();
         }
 

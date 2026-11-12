@@ -47,6 +47,7 @@ namespace PentaBrick.View
             var game = new GameObject("PentaBrick");
             game.AddComponent<BlockEditor>();
             game.AddComponent<GameUI>();
+            game.AddComponent<Sfx>();
         }
 
         private void Awake()

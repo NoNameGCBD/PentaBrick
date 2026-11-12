@@ -55,6 +55,7 @@ namespace PentaBrick.PlayTests
             yield return null;
             editor = new GameObject("PentaBrick").AddComponent<BlockEditor>();
             ui = editor.gameObject.AddComponent<GameUI>();
+            editor.gameObject.AddComponent<Sfx>(); // 효과음이 예외 없이 도는지도 함께 본다
             yield return null; // GameUI.Start와 첫 화면 구성
             yield return null;
             root = editor.GetComponent<UIDocument>().rootVisualElement;
