@@ -49,25 +49,13 @@ namespace PentaBrick.View
 
         private void BuildGame()
         {
-            var puzzle = state.Puzzle;
+            if (state.Puzzle != builtPuzzle)
+            {
+                builtPuzzle = state.Puzzle;
+                expandedView = null; // BlockEditor도 새 문제에서 기본 시점으로 돌아간다
+            }
 
-            // 상단 바 (5.2)
-            var top = Row(root);
-            top.style.backgroundColor = PanelColor;
-            top.style.paddingLeft = top.style.paddingRight = 14;
-            top.style.height = 40;
-            top.style.alignItems = Align.Center;
-            Text(top, "PentaBrick", 16, true).style.flexGrow = 1;
-            string size = $"({puzzle.Size}×{puzzle.Size}×{puzzle.Height})";
-            Text(top, state.IsCustom ? $"튜토리얼 {size}" : state.Mode == null
-                ? $"문제 샘플 {state.PuzzleIndex + 1} / {SamplePuzzles.All.Count} {size}"
-                : $"문제 {DifficultySettings.Get(state.Mode.Value).Label} · {SeedCode.Encode(puzzle.Seed.Value)} {size}").style.marginRight = 24;
-            Text(top, $"점수 {state.Score}", 13, true).style.marginRight = 24;
-            timeLabel = Text(top, "");
-            timeLabel.style.marginRight = 24;
-            Btn(top, "메뉴 (Esc)", OpenMenu);
-
-            BuildViews();
+            BuildHud();
 
             var body = Row(root);
             body.style.flexGrow = 1;
@@ -77,80 +65,132 @@ namespace PentaBrick.View
 
             center = new VisualElement { pickingMode = PickingMode.Ignore };
             center.style.flexGrow = 1;
-            center.style.justifyContent = Justify.FlexEnd;
-            center.style.alignItems = Align.Center;
             body.Add(center);
-            var viewButtons = Row(center);
-            viewButtons.style.marginBottom = 12;
-            Text(viewButtons, "시점", 12).style.marginRight = 6;
-            Btn(viewButtons, "기본", () => editor.SetView(null));
-            for (int i = 0; i < ViewNames.Length; i++)
-            {
-                var dir = (ViewDir)i;
-                Btn(viewButtons, ViewNames[i], () => editor.SetView(dir));
-            }
+            if (expandedView != null) BuildExpandedView(expandedView.Value);
             if (tutorial != null) BuildTutorialCard();
 
             BuildControls(Panel(body, 290));
         }
 
-        /// <summary>평면도 띠 (5.3, 상단 배치): 다섯 카드를 가로로, 각 카드에 목표와 내 모형의 평면도를 나란히.</summary>
-        private void BuildViews()
+        /// <summary>위쪽 HUD: 일시정지, 평면도 카드 다섯 장, 점수와 시간. 빈 곳은 3D 화면 클릭이 통과한다.</summary>
+        private void BuildHud()
         {
-            var panel = Row(root);
-            panel.style.backgroundColor = PanelColor;
-            panel.style.paddingLeft = panel.style.paddingRight = 8;
-            panel.style.paddingBottom = 8;
-            panel.style.borderTopWidth = 1;
-            panel.style.borderTopColor = LineColor;
+            var hud = Row(root);
+            hud.pickingMode = PickingMode.Ignore;
+            hud.style.alignItems = Align.FlexStart;
+            hud.style.paddingLeft = hud.style.paddingRight = hud.style.paddingTop = 10;
+
+            var left = Row(hud);
+            left.pickingMode = PickingMode.Ignore;
+            left.style.width = 140;
+            IconButton(left, "pause", Icon.Pause, "일시정지 (Esc)", OpenMenu);
+
+            var cards = Row(hud);
+            cards.pickingMode = PickingMode.Ignore;
+            cards.style.flexGrow = 1;
+            cards.style.justifyContent = Justify.Center;
             var mine = Projection.ProjectAll(state.Model);
-            for (int i = 0; i < ViewNames.Length; i++)
-            {
-                bool match = Projection.ViewsEqual(mine[i], state.Puzzle.Views[i]);
-                var card = new VisualElement();
-                card.style.backgroundColor = CardColor;
-                card.style.flexGrow = 1;
-                card.style.flexBasis = 0;
-                card.style.marginTop = 8;
-                card.style.marginLeft = card.style.marginRight = 4;
-                card.style.paddingLeft = card.style.paddingRight = card.style.paddingTop = card.style.paddingBottom = 8;
-                Border(card, state.ShowMine && match ? GoodColor : LineColor, 2);
-                panel.Add(card);
+            for (int i = 0; i < ViewNames.Length; i++) BuildViewCard(cards, (ViewDir)i, mine[i]);
 
-                var title = Row(card);
-                title.style.alignItems = Align.Center;
-                title.style.marginBottom = 6;
-                Text(title, ViewNames[i], 15, true).style.marginRight = 8;
-                var hint = Text(title, ViewHints[i], 10, false, DimColor);
-                hint.style.flexGrow = 1;
-                hint.style.flexShrink = 1;
-                if (state.ShowMine) Text(title, match ? "일치" : "불일치", 11, true, match ? GoodColor : DimColor);
-
-                var grids = Row(card);
-                Grid(grids, "목표", state.Puzzle.Views[i]);
-                if (state.ShowMine) Grid(grids, "내 모형", mine[i]);
-            }
+            var right = Row(hud);
+            right.pickingMode = PickingMode.Ignore;
+            right.style.width = 140;
+            right.style.justifyContent = Justify.FlexEnd;
+            right.style.alignItems = Align.Center;
+            right.style.height = 44;
+            var score = Text(right, $"★ {state.Score}", 15, true);
+            score.name = "score";
+            score.style.marginRight = 12;
+            timeLabel = Text(right, "", 15);
+            timeLabel.name = "timer";
         }
 
-        private void Grid(VisualElement parent, string caption, int[,] view)
+        /// <summary>작은 평면도 카드. 누르면 그 방향으로 시점을 돌리고 크게 펼친다.</summary>
+        private void BuildViewCard(VisualElement parent, ViewDir dir, int[,] mine)
         {
-            var box = new VisualElement();
-            box.style.marginRight = 14;
+            var target = state.Puzzle.Views[(int)dir];
+            bool match = state.ShowMine && Projection.ViewsEqual(mine, target); // 일치 여부는 힌트라 연습용 설정을 켰을 때만
+            bool selected = expandedView == dir;
+            var card = new Button(() => ToggleView(dir)) { name = "view-" + dir.ToString().ToLowerInvariant(), text = "", tooltip = ViewHints[(int)dir] };
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.alignItems = Align.Center;
+            card.style.minWidth = 48;
+            card.style.marginLeft = card.style.marginRight = 4;
+            card.style.paddingLeft = card.style.paddingRight = card.style.paddingTop = card.style.paddingBottom = 4;
+            card.style.backgroundColor = CardColor;
+            card.style.borderTopLeftRadius = card.style.borderTopRightRadius = card.style.borderBottomLeftRadius = card.style.borderBottomRightRadius = 8;
+            Border(card, selected ? SelectColor : match ? GoodColor : LineColor, 2);
+            if (match) card.AddToClassList("match");
+            if (selected) card.AddToClassList("selected");
+            parent.Add(card);
+            Text(card, ViewNames[(int)dir], 10, true, DimColor).style.marginBottom = 2;
+            int size = Mathf.Max(target.GetLength(0), target.GetLength(1));
+            Grid(card, null, target, Mathf.Max(8, 40 / size));
+        }
+
+        /// <summary>펼친 평면도 카드: HUD 바로 아래 가운데에 크게. 내 모형 표시를 켰으면 나란히.</summary>
+        private void BuildExpandedView(ViewDir dir)
+        {
+            var holder = new VisualElement { pickingMode = PickingMode.Ignore };
+            holder.style.position = Position.Absolute;
+            holder.style.left = holder.style.right = 0;
+            holder.style.top = 8;
+            holder.style.alignItems = Align.Center;
+            center.Add(holder);
+
+            var card = new VisualElement { name = "view-expanded" };
+            card.style.flexDirection = FlexDirection.Row;
+            card.style.backgroundColor = PanelColor;
+            card.style.paddingLeft = card.style.paddingRight = card.style.paddingTop = card.style.paddingBottom = 10;
+            card.style.borderTopLeftRadius = card.style.borderTopRightRadius = card.style.borderBottomLeftRadius = card.style.borderBottomRightRadius = 10;
+            Border(card, SelectColor, 2);
+            holder.Add(card);
+            Grid(card, $"{ViewNames[(int)dir]} · 목표", state.Puzzle.Views[(int)dir], 28);
+            if (state.ShowMine) Grid(card, "내 모형", Projection.Project(state.Model, dir), 28);
+        }
+
+        private void Grid(VisualElement parent, string caption, int[,] view, int cell)
+        {
+            var box = new VisualElement { pickingMode = PickingMode.Ignore };
             parent.Add(box);
-            Text(box, caption, 10, false, DimColor);
-            int cell = Mathf.Min(16, 75 / Mathf.Max(view.GetLength(0), view.GetLength(1))); // 5×5도 카드 안에 들어가게
+            if (caption != null)
+            {
+                Text(box, caption, 11, false, DimColor).style.marginBottom = 4;
+                if (parent.childCount > 1) box.style.marginLeft = 14;
+            }
             for (int r = 0; r < view.GetLength(0); r++)
             {
                 var row = Row(box);
+                row.pickingMode = PickingMode.Ignore;
                 for (int c = 0; c < view.GetLength(1); c++)
                 {
-                    var square = new VisualElement();
+                    var square = new VisualElement { pickingMode = PickingMode.Ignore };
                     square.style.width = square.style.height = cell;
                     square.style.backgroundColor = (Color)ColorValues[view[r, c]];
                     Border(square, PanelColor, 1);
                     row.Add(square);
                 }
             }
+        }
+
+        /// <summary>같은 카드면 닫고 기본 시점으로, 아니면 펼치고 그 방향으로.</summary>
+        private void ToggleView(ViewDir dir)
+        {
+            if (expandedView == dir)
+            {
+                ResetView();
+                return;
+            }
+            expandedView = dir;
+            editor.SetView(dir);
+            dirty = true;
+        }
+
+        private void ResetView()
+        {
+            expandedView = null;
+            editor.SetView(null);
+            dirty = true;
         }
 
         /// <summary>조작 패널 (5.5, 5.6).</summary>

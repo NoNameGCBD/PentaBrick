@@ -73,6 +73,7 @@ namespace PentaBrick.PlayTests
 
         private IEnumerator Save(string file)
         {
+            yield return new WaitForSecondsRealtime(0.35f); // 전환·창 애니메이션이 끝난 모습을 찍는다
             yield return null; // 카메라가 먼저, UI가 그 위에 그려지는 실제 순서 그대로 한 프레임을 그린다
             yield return null;
             var panel = editor.GetComponent<UIDocument>().panelSettings;
@@ -142,15 +143,14 @@ namespace PentaBrick.PlayTests
             Assert.AreEqual(UiScreen.Game, ui.CurrentScreen);
             Assert.IsTrue(editor.enabled);
             Assert.AreEqual(Difficulty.Hard, editor.State.Mode);
-            Assert.AreEqual(1, CountLabels("상"), "평면도 카드");
-            Assert.AreEqual(1, CountButtons("메뉴 (Esc)"));
+            Assert.IsNotNull(ByName<VisualElement>("view-top"), "평면도 카드");
+            Assert.IsNotNull(ByName<Button>("pause"));
             Assert.AreEqual(0, CountButtons("메인 메뉴"), "메인 메뉴·난이도 변경은 Esc 메뉴 안으로 옮겼다");
             Assert.AreEqual(0, CountButtons("난이도 변경"));
             Assert.AreEqual(0, Live<Toggle>().ToList().Count, "평면도 표시 옵션은 설정으로 옮겼다");
-            var basicView = Live<Button>().Where(b => b.text == "기본").First();
-            Assert.IsNotNull(basicView, "시점 버튼");
-            Assert.Greater(basicView.worldBound.height, 0);
-            Assert.LessOrEqual(basicView.worldBound.yMax, root.worldBound.yMax + 0.5f, "시점 버튼이 화면 안에 있다");
+            var rightView = ByName<VisualElement>("view-right");
+            Assert.Greater(rightView.worldBound.height, 0);
+            Assert.LessOrEqual(rightView.worldBound.xMax, root.worldBound.xMax + 0.5f, "평면도 카드가 화면 안에 있다");
             yield return Save("ui-game-hard.png");
 
             ui.Show(UiScreen.Main);
@@ -181,7 +181,7 @@ namespace PentaBrick.PlayTests
             var state = editor.State;
 
             // 아무것도 안 놓았으면 바로 나간다.
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("메인 메뉴");
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.IsFalse(ui.IsConfirming);
@@ -192,7 +192,7 @@ namespace PentaBrick.PlayTests
             yield return null;
 
             // 메인 메뉴 → 확인 창 → 계속 풀기: 그대로 남는다.
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("메인 메뉴");
             Assert.IsTrue(ui.IsConfirming);
             Assert.AreEqual(UiScreen.Game, ui.CurrentScreen);
@@ -206,7 +206,7 @@ namespace PentaBrick.PlayTests
             Assert.AreEqual(1, state.UsedTotal);
 
             // 난이도 변경 → 나가기
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("난이도 변경");
             Assert.IsTrue(ui.IsConfirming);
             yield return Click("나가기");
@@ -219,7 +219,7 @@ namespace PentaBrick.PlayTests
             state.Place(0, 0);
             state.Reset(); // 블록은 없지만 초기화를 되돌릴 수 있으므로 잃을 것이 있다
             yield return null;
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("다음 샘플");
             Assert.IsTrue(ui.IsConfirming);
             yield return Click("나가기");
@@ -229,10 +229,34 @@ namespace PentaBrick.PlayTests
             state.Place(0, 0);
             state.DeclareImpossible();
             yield return null;
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("메인 메뉴");
             Assert.IsFalse(ui.IsConfirming);
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
+        }
+
+        [UnityTest]
+        public IEnumerator 평면도_카드를_누르면_그_방향으로_보고_펼쳐진다()
+        {
+            ui.Play(null);
+            yield return null;
+            Assert.AreEqual(0, CountButtons("메뉴 (Esc)"), "상단 글자 바 없음");
+            Assert.AreEqual(0, CountButtons("기본"), "시점 버튼 줄 없음");
+            Assert.IsNull(root.Q("view-expanded"));
+            yield return ClickName("view-front");
+            Assert.AreEqual(ViewDir.Front, ui.ExpandedView);
+            Assert.IsNotNull(ByName<VisualElement>("view-expanded"));
+            yield return ClickName("view-left");
+            Assert.AreEqual(ViewDir.Left, ui.ExpandedView, "다른 카드로 바로 바뀜");
+            yield return Save("ui-game-hud.png");
+            yield return ClickName("view-left");
+            Assert.IsNull(ui.ExpandedView, "같은 카드를 다시 누르면 닫힘");
+            Assert.IsNull(root.Q("view-expanded"));
+            Assert.IsNotNull(ByName<VisualElement>("score"));
+            Assert.IsNotNull(ByName<VisualElement>("timer"));
+            Assert.IsFalse(ByName<VisualElement>("view-top").ClassListContains("match"), "내 모형 평면도 표시를 끄면 일치 표시 없음");
+            yield return ClickName("pause");
+            Assert.IsTrue(ui.IsMenuOpen);
         }
 
         [UnityTest]
@@ -257,7 +281,6 @@ namespace PentaBrick.PlayTests
             yield return Click("게임 시작");
             Assert.AreEqual(UiScreen.DifficultySelect, ui.CurrentScreen);
             Assert.IsTrue(ui.IsTransitioning);
-            yield return Save("ui-transition.png");
 
             // 전환 중에 덮인 막이 클릭을 막지 않는다.
             yield return Click("← 메인으로");
@@ -380,12 +403,12 @@ namespace PentaBrick.PlayTests
 
             yield return Click("튜토리얼"); // 메인 화면의 버튼
             Assert.IsTrue(ui.InTutorial);
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("다음 샘플"); // 다른 문제로 넘어가면 튜토리얼은 끝난다
             yield return null;
             Assert.IsFalse(ui.InTutorial);
 
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("튜토리얼"); // Esc 메뉴의 버튼
             Assert.IsTrue(ui.InTutorial);
             Assert.AreEqual(1, CountLabels("튜토리얼 1 / 10"));
@@ -428,7 +451,7 @@ namespace PentaBrick.PlayTests
             Assert.IsFalse(ui.IsMenuOpen);
             Assert.IsTrue(editor.enabled);
 
-            yield return Click("메뉴 (Esc)");
+            yield return ClickName("pause");
             yield return Click("계속하기");
             Assert.IsFalse(ui.IsMenuOpen);
             Assert.IsTrue(editor.enabled);
@@ -483,7 +506,8 @@ namespace PentaBrick.PlayTests
             Assert.IsFalse(swatches[1].enabledSelf, "주황");
             Assert.IsFalse(swatches[5].enabledSelf, "보라");
             Assert.IsTrue(swatches[0].enabledSelf, "빨강");
-            Assert.AreEqual(5, CountLabels("일치"));
+            foreach (var dir in new[] { "top", "front", "back", "left", "right" })
+                Assert.IsTrue(ByName<VisualElement>("view-" + dir).ClassListContains("match"), dir);
             yield return Save("ui-game-sample.png");
 
             state.Submit();

@@ -24,7 +24,7 @@ namespace PentaBrick.View
             new Color32(0xe5, 0x48, 0x4d, 255), new Color32(0xf0, 0x8c, 0x2e, 255), new Color32(0xf2, 0xc9, 0x4c, 255),
             new Color32(0x3f, 0xb5, 0x6b, 255), new Color32(0x3b, 0x82, 0xf6, 255), new Color32(0x9b, 0x5d, 0xe5, 255),
         };
-        private static readonly string[] ViewNames = { "상", "전", "후", "좌", "우" };
+        private static readonly string[] ViewNames = { "위", "앞", "뒤", "왼쪽", "오른쪽" };
         private static readonly string[] ViewHints =
         {
             "위에서 · 아래쪽이 앞", "앞에서", "뒤에서 · 좌우 반전", "왼쪽에서 · 오른쪽이 앞", "오른쪽에서 · 왼쪽이 앞",
@@ -45,6 +45,8 @@ namespace PentaBrick.View
         private VisualElement root;
         private VisualElement center; // 3D 화면이 보이는 가운데 영역
         private Label timeLabel;
+        private ViewDir? expandedView; // 펼친 평면도 카드(그 방향으로 시점을 돌린 상태)
+        private Puzzle builtPuzzle;
         private bool dirty = true;
         private string codeInput = "";
         private string codeMessage = "";
@@ -155,6 +157,9 @@ namespace PentaBrick.View
 
         /// <summary>게임 종료 확인 창이 떠 있는지.</summary>
         public bool IsQuitOpen => quitOpen;
+
+        /// <summary>펼친 평면도 카드의 방향. 없으면 null(기본 시점).</summary>
+        public ViewDir? ExpandedView => expandedView;
 
         /// <summary>화면 전환 애니메이션이 진행 중인지.</summary>
         public bool IsTransitioning => Time.unscaledTime - screenStart < ScreenFade;
@@ -317,6 +322,7 @@ namespace PentaBrick.View
             if (screen != UiScreen.Game) EndTutorial();
             CurrentScreen = screen;
             menuOpen = settingsOpen = quitOpen = false;
+            expandedView = null;
             RefreshInput();
             codeMessage = "";
             dirty = true;
@@ -373,11 +379,11 @@ namespace PentaBrick.View
             if (CurrentScreen == UiScreen.Intro) UpdateIntro();
             if (CurrentScreen != UiScreen.Game) return;
             int seconds = (int)(state.ElapsedMs / 1000);
-            timeLabel.text = $"시간 {seconds / 60:00}:{seconds % 60:00}";
+            timeLabel.text = $"{seconds / 60:00}:{seconds % 60:00}";
             if (state.Mode != null)
             {
-                int bonus = DifficultySettings.Get(state.Mode.Value).BonusSeconds;
-                timeLabel.text += $" / 보너스 {bonus / 60:00}:{bonus % 60:00}";
+                int bonus = DifficultySettings.Get(state.Mode.Value).BonusSeconds; // 이 시간 안에 맞히면 보너스
+                timeLabel.text += $"<color=#9aa0ad> / {bonus / 60:00}:{bonus % 60:00}</color>";
             }
 
             // 3D 카메라가 가운데 영역에만 그리게 한다(모형이 패널에 가려지지 않게).
