@@ -183,7 +183,7 @@ namespace PentaBrick.PlayTests
 
             // 아무것도 안 놓았으면 바로 나간다.
             yield return ClickName("pause");
-            yield return Click("메인 메뉴");
+            yield return ClickName("pause-home");
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.IsFalse(ui.IsConfirming);
 
@@ -194,24 +194,24 @@ namespace PentaBrick.PlayTests
 
             // 메인 메뉴 → 확인 창 → 계속 풀기: 그대로 남는다.
             yield return ClickName("pause");
-            yield return Click("메인 메뉴");
+            yield return ClickName("pause-home");
             Assert.IsTrue(ui.IsConfirming);
             Assert.AreEqual(UiScreen.Game, ui.CurrentScreen);
             Assert.IsFalse(editor.enabled, "확인 창이 떠 있는 동안 편집 입력을 막는다");
             Assert.IsTrue(ui.IsPointerOverUI(new Vector2(UnityEngine.Screen.width / 2f, UnityEngine.Screen.height / 2f)), "3D 화면 클릭도 막는다");
             yield return Save("ui-confirm.png");
-            yield return Click("계속 풀기");
+            yield return ClickName("confirm-stay");
             Assert.IsFalse(ui.IsConfirming);
             Assert.AreEqual(UiScreen.Game, ui.CurrentScreen);
             Assert.IsTrue(editor.enabled);
             Assert.AreEqual(1, state.UsedTotal);
 
-            // 난이도 변경 → 나가기
+            // 메인 → 나가기
             yield return ClickName("pause");
-            yield return Click("난이도 변경");
+            yield return ClickName("pause-home");
             Assert.IsTrue(ui.IsConfirming);
-            yield return Click("나가기");
-            Assert.AreEqual(UiScreen.DifficultySelect, ui.CurrentScreen);
+            yield return ClickName("confirm-leave");
+            Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.IsFalse(editor.enabled);
 
             // 다음 샘플 → 나가기: 다음 문제로
@@ -221,9 +221,9 @@ namespace PentaBrick.PlayTests
             state.Reset(); // 블록은 없지만 초기화를 되돌릴 수 있으므로 잃을 것이 있다
             yield return null;
             yield return ClickName("pause");
-            yield return Click("다음 샘플");
+            yield return ClickName("pause-next");
             Assert.IsTrue(ui.IsConfirming);
-            yield return Click("나가기");
+            yield return ClickName("confirm-leave");
             Assert.AreEqual("p2", state.Puzzle.Id);
 
             // 제출한 뒤에는 묻지 않는다.
@@ -231,7 +231,7 @@ namespace PentaBrick.PlayTests
             state.DeclareImpossible();
             yield return null;
             yield return ClickName("pause");
-            yield return Click("메인 메뉴");
+            yield return ClickName("pause-home");
             Assert.IsFalse(ui.IsConfirming);
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
         }
@@ -400,7 +400,7 @@ namespace PentaBrick.PlayTests
             yield return Save("ui-quit.png");
 
             // "종료"는 에디터에서 플레이 모드를 끝내므로 누르지 않는다.
-            yield return Click("취소");
+            yield return ClickName("quit-cancel");
             Assert.IsFalse(ui.IsQuitOpen);
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.AreEqual(1, root.Query(className: GameUI.ClosingClass).ToList().Count, "닫힌 창이 서서히 사라지는 중");
@@ -504,34 +504,36 @@ namespace PentaBrick.PlayTests
             yield return Click("튜토리얼"); // 메인 화면의 버튼
             Assert.IsTrue(ui.InTutorial);
             yield return ClickName("pause");
-            yield return Click("다음 샘플"); // 다른 문제로 넘어가면 튜토리얼은 끝난다
+            yield return ClickName("pause-next"); // 다른 문제로 넘어가면 튜토리얼은 끝난다
             yield return null;
             Assert.IsFalse(ui.InTutorial);
 
             yield return ClickName("pause");
-            yield return Click("튜토리얼"); // Esc 메뉴의 버튼
+            yield return ClickName("pause-tutorial"); // 일시정지 창의 버튼
             Assert.IsTrue(ui.InTutorial);
             Assert.AreEqual(1, CountLabels("튜토리얼 1 / 10"));
         }
 
         [UnityTest]
-        public IEnumerator Esc_메뉴와_설정()
+        public IEnumerator 일시정지와_설정()
         {
             ui.Play(null);
             yield return null;
             ui.OnEscape();
             yield return null;
             Assert.IsTrue(ui.IsMenuOpen);
-            Assert.IsFalse(editor.enabled, "메뉴가 떠 있는 동안 편집 입력을 막는다");
-            foreach (string text in new[] { "계속하기", "다음 샘플", "난이도 변경", "설정", "메인 메뉴" })
-                Assert.AreEqual(1, CountButtons(text), text);
-            yield return Save("ui-menu.png");
+            Assert.IsFalse(editor.enabled, "일시정지 창이 떠 있는 동안 편집 입력을 막는다");
+            Assert.AreEqual(1, CountLabels("샘플 1 / 6"), "제목은 문제 이름");
+            Assert.AreEqual(0, CountButtons("난이도 변경"));
+            Assert.IsFalse(ByName<Button>("pause-restart").enabledSelf, "놓은 블록이 없으면 다시 시작 비활성");
+            Assert.IsNull(root.Q("pause-copy"), "샘플은 코드 복사 없음");
+            yield return Save("ui-pause.png");
 
-            yield return Click("설정");
-            var volume = Live<Slider>().Where(x => x.label == "소리 크기").First(); // 스크롤바도 Slider라서 이름으로 찾는다
-            Assert.IsNotNull(volume, "소리 크기");
-            var showMine = Live<Toggle>().Where(x => x.label.StartsWith("내 모형")).First();
-            Assert.IsNotNull(showMine, "평면도 표시");
+            yield return ClickName("pause-settings");
+            Assert.IsTrue(ui.IsSettingsOpen);
+            Assert.IsTrue(ui.IsMenuOpen, "설정은 일시정지 위에 뜬다");
+            var volume = ByName<Slider>("settings-volume");
+            var showMine = ByName<Toggle>("settings-showmine");
             volume.value = 0.25f;
             showMine.value = true;
             yield return null;
@@ -539,37 +541,40 @@ namespace PentaBrick.PlayTests
             Assert.AreEqual(0.25f, PlayerPrefs.GetFloat("volume"), 1e-4f, "다음 실행에도 유지");
             Assert.IsTrue(editor.State.ShowMine);
             Assert.IsTrue(showMine.enabledSelf, "연습 모드에서는 켤 수 있다");
-            Assert.AreEqual(1, CountButtons("점수 초기화"));
+            Assert.IsNotNull(ByName<Button>("settings-reset"));
             yield return Save("ui-settings.png");
-
-            ui.OnEscape(); // 설정 → 메뉴
+            ui.OnEscape();
             yield return null;
-            Assert.IsTrue(ui.IsMenuOpen);
-            Assert.AreEqual(1, CountButtons("계속하기"));
-            ui.OnEscape(); // 메뉴 닫기
-            yield return null;
+            Assert.IsFalse(ui.IsSettingsOpen);
+            Assert.IsTrue(ui.IsMenuOpen, "설정을 닫으면 일시정지로");
+            yield return ClickName("pause-resume");
             Assert.IsFalse(ui.IsMenuOpen);
             Assert.IsTrue(editor.enabled);
 
-            yield return ClickName("pause");
-            yield return Click("계속하기");
-            Assert.IsFalse(ui.IsMenuOpen);
-            Assert.IsTrue(editor.enabled);
+            editor.State.Place(0, 0);
+            ui.OnEscape();
+            yield return null;
+            yield return ClickName("pause-restart");
+            Assert.IsTrue(ui.IsConfirming, "다시 시작은 확인을 거친다");
+            yield return ClickName("confirm-leave");
+            Assert.AreEqual(0, editor.State.UsedTotal);
+            Assert.IsTrue(editor.State.CanUndo, "다시 시작도 실행 취소로 되돌릴 수 있다");
 
-            ui.Play(Difficulty.Easy); // 난이도 모드: 평면도 표시를 켤 수 없다
+            editor.State.DeclareImpossible(); // 결과 중 Esc → 일시정지
             yield return null;
             ui.OnEscape();
             yield return null;
-            yield return Click("설정");
-            Assert.IsFalse(Live<Toggle>().Where(x => x.label.StartsWith("내 모형")).First().enabledSelf);
+            Assert.IsTrue(ui.IsMenuOpen);
+
+            ui.Play(Difficulty.Easy); // 난이도 모드: 평면도 표시를 켤 수 없고, 코드 복사가 있다
+            yield return null;
+            ui.OnEscape();
+            yield return null;
+            Assert.IsNotNull(ByName<Button>("pause-copy"));
+            yield return ClickName("pause-settings");
+            Assert.IsFalse(ByName<Toggle>("settings-showmine").enabledSelf);
             Assert.IsFalse(editor.State.ShowMine);
             Assert.AreEqual(0, CountLabels("내 모형"), "평면도 카드에 내 모형 격자가 없다");
-
-            ui.Show(UiScreen.Main);
-            yield return null;
-            ui.OnEscape(); // 메인 화면에서는 메뉴 대신 종료 확인 창
-            Assert.IsFalse(ui.IsMenuOpen);
-
             AudioListener.volume = 1f;
         }
 

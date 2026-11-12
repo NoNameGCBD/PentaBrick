@@ -52,6 +52,7 @@ namespace PentaBrick.View
         private string codeMessage = "";
         private string confirmMessage; // null이 아니면 확인 창을 띄운다
         private Action confirmAction;
+        private string confirmDetail;
         private bool menuOpen;     // Esc 메뉴
         private bool settingsOpen; // Esc 메뉴 안의 설정
         private bool quitOpen;     // 메인 화면의 게임 종료 확인 창
@@ -158,6 +159,9 @@ namespace PentaBrick.View
         /// <summary>게임 종료 확인 창이 떠 있는지.</summary>
         public bool IsQuitOpen => quitOpen;
 
+        /// <summary>설정 창이 떠 있는지(메인이나 일시정지에서 연다).</summary>
+        public bool IsSettingsOpen => settingsOpen;
+
         /// <summary>펼친 평면도 카드의 방향. 없으면 null(기본 시점).</summary>
         public ViewDir? ExpandedView => expandedView;
 
@@ -165,11 +169,17 @@ namespace PentaBrick.View
         public bool IsTransitioning => Time.unscaledTime - screenStart < ScreenFade;
 
         /// <summary>게임 화면에서 창이 하나도 안 떠 있을 때만 3D 편집과 단축키를 받는다.</summary>
-        private void RefreshInput() => editor.enabled = CurrentScreen == UiScreen.Game && !menuOpen && !IsConfirming;
+        private void RefreshInput() => editor.enabled = CurrentScreen == UiScreen.Game && !menuOpen && !settingsOpen && !IsConfirming;
 
         /// <summary>Esc: 메인 화면에서는 종료 확인 창을 열고 닫는다. 게임 화면에서는 떠 있는 창을 하나 닫고(확인 창 → 설정 → 메뉴), 아무것도 없으면 메뉴를 연다.</summary>
         public void OnEscape()
         {
+            if (CurrentScreen == UiScreen.Main && settingsOpen)
+            {
+                settingsOpen = false;
+                dirty = true;
+                return;
+            }
             if (CurrentScreen == UiScreen.Main && !askTutorial)
             {
                 quitOpen = !quitOpen;
@@ -197,7 +207,7 @@ namespace PentaBrick.View
         }
 
         /// <summary>풀던 문제가 있으면 확인 창을 띄우고, 없으면 바로 실행한다.</summary>
-        private void LeavePuzzle(string message, Action leave)
+        private void LeavePuzzle(string message, Action leave, string detail = "놓은 블록과 경과 시간이 사라집니다. 점수는 바뀌지 않습니다.")
         {
             menuOpen = settingsOpen = false;
             dirty = true;
@@ -208,6 +218,7 @@ namespace PentaBrick.View
             }
             confirmMessage = message;
             confirmAction = leave;
+            confirmDetail = detail;
             RefreshInput();
         }
 
@@ -418,11 +429,12 @@ namespace PentaBrick.View
 
             modalOverlay = modalBox = null;
             if (menuOpen) BuildMenu();
+            if (settingsOpen) BuildSettings();
             if (IsConfirming) BuildConfirm();
             if (askTutorial && CurrentScreen == UiScreen.Main) BuildTutorialPrompt();
             if (quitOpen && CurrentScreen == UiScreen.Main) BuildQuitConfirm();
             // 새 창이 열렸을 때만 다시 튀어나오게 한다(같은 창이 다시 그려질 때는 이어서).
-            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : menuOpen ? "menu" : "result";
+            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : settingsOpen ? "settings" : menuOpen ? "menu" : "result";
             if (modal != builtModal)
             {
                 if (builtModal != null && previousOverlay != null)
@@ -479,6 +491,7 @@ namespace PentaBrick.View
             box.style.width = width;
             box.style.backgroundColor = PanelColor;
             box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 20;
+            box.style.borderTopLeftRadius = box.style.borderTopRightRadius = box.style.borderBottomLeftRadius = box.style.borderBottomRightRadius = 16;
             Border(box, LineColor, 1);
             overlay.Add(box);
             modalOverlay = overlay;
