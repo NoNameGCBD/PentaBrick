@@ -15,8 +15,11 @@ namespace PentaBrick.View
         private AudioClip[] clips; // 인덱스 = (int)Sound
         private GameState state;
         private SoundCue.Snapshot last;
+        private AudioClip[] introBlocks; // 인트로 블록 여섯 개, 떨어질수록 한 음씩 높게(5음계)
+        private AudioClip introTitle;
 
-        private void Start()
+        // 인트로는 GameUI.Start 직후부터 소리를 내므로 클립은 Awake에서 만든다.
+        private void Awake()
         {
             source = gameObject.AddComponent<AudioSource>();
             clips = new[]
@@ -28,6 +31,14 @@ namespace PentaBrick.View
                 Clip("correct", (523, 0.09f, false), (659, 0.09f, false), (784, 0.22f, false)), // 올라가는 세 음(도미솔)
                 Clip("wrong", (330, 0.12f, true), (247, 0.25f, true)),                          // 내려가는 두 음, 사각파
             };
+            float[] scale = { 523, 587, 659, 784, 880, 1047 }; // 도 레 미 솔 라 도
+            introBlocks = new AudioClip[scale.Length];
+            for (int i = 0; i < scale.Length; i++) introBlocks[i] = Clip("intro-block", (scale[i], 0.12f, false));
+            introTitle = Clip("intro-title", (784, 0.07f, false), (1047, 0.07f, false), (1568, 0.6f, false)); // 솔-도-솔, 마지막 음을 길게
+        }
+
+        private void Start()
+        {
             state = GetComponent<BlockEditor>().State;
             last = SoundCue.Snapshot.Of(state);
             state.Changed += () =>
@@ -37,6 +48,10 @@ namespace PentaBrick.View
                 if (sound != Sound.None) source.PlayOneShot(clips[(int)sound]);
             };
         }
+
+        public void PlayIntroBlock(int index) => source.PlayOneShot(introBlocks[index % introBlocks.Length]);
+
+        public void PlayIntroTitle() => source.PlayOneShot(introTitle);
 
         /// <summary>음들을 이어 붙인 클립. 음마다 빠르게 줄어드는 소리(타악기처럼)로 만든다.</summary>
         private static AudioClip Clip(string name, params (float freq, float seconds, bool square)[] notes)

@@ -266,6 +266,7 @@ namespace PentaBrick.View
         private Label introTitle, introSubtitle, introPress;
         private const float BlockDrop = 0.5f, BlockGap = 0.12f; // 블록 하나가 떨어지는 시간, 다음 블록까지의 간격(초)
         private float IntroTime => Time.unscaledTime - introStart;
+        private float introPrev; // 지난 프레임의 IntroTime. 소리 낼 순간을 지났는지 본다
 
         /// <summary>인트로에서 아무 버튼이나 누르면 메인 화면으로.</summary>
         public void EnterMain()
@@ -313,14 +314,19 @@ namespace PentaBrick.View
         /// <summary>매 프레임 인트로 애니메이션을 진행하고, 아무 입력이나 들어오면 메인으로 넘어간다.</summary>
         private void UpdateIntro()
         {
-            float t = IntroTime;
+            float t = IntroTime, prev = introPrev;
+            introPrev = t;
+            bool Crossed(float at) => prev < at && at <= t;
+            var sfx = GetComponent<Sfx>();
             for (int i = 0; i < introBlocks.Count; i++)
             {
+                if (Crossed(i * BlockGap + BlockDrop / 2.75f) && sfx != null) sfx.PlayIntroBlock(i); // Bounce가 처음 바닥에 닿는 순간
                 float p = Mathf.Clamp01((t - i * BlockGap) / BlockDrop);
                 introBlocks[i].style.opacity = p > 0 ? 1 : 0;
                 introBlocks[i].style.translate = new Translate(0, -260 * (1 - Bounce(p)));
             }
             float titleStart = introBlocks.Count * BlockGap + BlockDrop * 0.6f;
+            if (Crossed(titleStart) && sfx != null) sfx.PlayIntroTitle();
             float title = Mathf.Clamp01((t - titleStart) / 0.6f);
             introTitle.style.opacity = title;
             introTitle.style.translate = new Translate(0, 16 * (1 - title));
@@ -357,7 +363,7 @@ namespace PentaBrick.View
 
         public void Show(UiScreen screen)
         {
-            if (screen == UiScreen.Intro) introStart = Time.unscaledTime;
+            if (screen == UiScreen.Intro) { introStart = Time.unscaledTime; introPrev = -1; }
             if (screen != UiScreen.Game) EndTutorial();
             CurrentScreen = screen;
             menuOpen = settingsOpen = quitOpen = codeOpen = false;
