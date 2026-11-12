@@ -561,6 +561,24 @@ namespace PentaBrick.View
             return button;
         }
 
+        /// <summary>정사각형 아이콘 버튼. 이름은 테스트가 찾는 데, 툴팁은 이름과 단축키를 알려 주는 데 쓴다.</summary>
+        private static Button IconButton(VisualElement parent, string name, Icon icon, string tooltip, Action onClick, float size = 44f)
+        {
+            var button = new Button(onClick) { name = name, tooltip = tooltip, text = "" };
+            button.AddToClassList("icon-button");
+            button.style.width = button.style.height = size;
+            button.style.paddingLeft = button.style.paddingRight = button.style.paddingTop = button.style.paddingBottom = 0;
+            button.style.marginLeft = button.style.marginRight = 3;
+            button.style.alignItems = Align.Center;
+            button.style.justifyContent = Justify.Center;
+            button.style.backgroundColor = CardColor;
+            button.style.borderTopLeftRadius = button.style.borderTopRightRadius = button.style.borderBottomLeftRadius = button.style.borderBottomRightRadius = size * 0.25f;
+            Border(button, LineColor, 1);
+            button.Add(Icons.Make(icon, size * 0.6f, TextColor));
+            parent.Add(button);
+            return button;
+        }
+
         private static void Border(VisualElement element, Color color, int width)
         {
             element.style.borderLeftWidth = element.style.borderRightWidth = element.style.borderTopWidth = element.style.borderBottomWidth = width;

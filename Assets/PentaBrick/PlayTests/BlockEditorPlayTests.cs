@@ -236,6 +236,22 @@ namespace PentaBrick.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator 모든_아이콘을_그릴_수_있다()
+        {
+            // 메인 화면 위에 모든 아이콘을 한 줄로 붙이고 캡처한다.
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.position = Position.Absolute;
+            row.style.top = 10;
+            row.style.left = 10;
+            foreach (Icon icon in System.Enum.GetValues(typeof(Icon))) row.Add(Icons.Make(icon, 40, Color.white));
+            root.Add(row);
+            yield return Save("ui-icons.png");
+            Assert.AreEqual(System.Enum.GetValues(typeof(Icon)).Length, row.childCount);
+            foreach (var child in row.Children()) Assert.AreEqual(40f, child.resolvedStyle.width, 0.5f);
+        }
+
+        [UnityTest]
         public IEnumerator 화면이_바뀌면_전환_애니메이션이_재생되고_그동안에도_클릭할_수_있다()
         {
             yield return Click("게임 시작");

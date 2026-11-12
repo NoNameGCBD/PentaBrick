@@ -1,1 +1,4 @@
 @import url("unity-theme://default");
+
+/* 아이콘 버튼은 비활성일 때 더 흐리게 */
+.icon-button:disabled { opacity: 0.35; }
