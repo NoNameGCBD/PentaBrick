@@ -194,6 +194,7 @@ namespace PentaBrick.View
             var tiles = Row(page);
             tiles.style.flexWrap = Wrap.Wrap;
             tiles.style.justifyContent = Justify.Center;
+            if (portrait) tiles.style.width = 2 * (140 + 16) + 8; // 세로 화면은 2×2(반올림에 밀려 줄이 바뀌지 않게 여유)
             ModeTile(tiles, "mode-sample", "연습", $"샘플 {SamplePuzzles.All.Count}", () => Play(null));
             foreach (Difficulty difficulty in Enum.GetValues(typeof(Difficulty)))
             {

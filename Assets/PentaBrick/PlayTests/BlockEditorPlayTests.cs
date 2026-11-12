@@ -117,6 +117,15 @@ namespace PentaBrick.PlayTests
             yield return null;
         }
 
+        /// <summary>화면(캡처 텍스처) 크기를 바꾸고 새 배치가 그려질 때까지 기다린다.</summary>
+        private IEnumerator Resize(int width, int height)
+        {
+            capture = new RenderTexture(width, height, 24);
+            Camera.main.targetTexture = capture;
+            editor.GetComponent<UIDocument>().panelSettings.targetTexture = capture;
+            for (int i = 0; i < 4; i++) yield return null;
+        }
+
         private int CountLabels(string text) => Live<Label>().Where(l => l.text == text).ToList().Count;
         private int CountButtons(string start) => Live<Button>().Where(b => b.text.StartsWith(start)).ToList().Count;
 
@@ -380,6 +389,59 @@ namespace PentaBrick.PlayTests
             }
             Assert.IsTrue(anyWrong);
             yield return Save("ui-result-wrong.png");
+        }
+
+        [UnityTest]
+        public IEnumerator 세로_화면에서도_모든_버튼이_화면_안에_들어온다()
+        {
+            ui.Play(Difficulty.Hard); // 6색, 5×5
+            yield return null;
+            yield return ClickName("view-front");
+            Assert.IsFalse(ui.IsPortrait);
+            yield return Resize(400, 800);
+            Assert.IsTrue(ui.IsPortrait);
+            Assert.AreEqual(ViewDir.Front, ui.ExpandedView, "배치가 바뀌어도 펼친 카드 유지");
+            Assert.LessOrEqual(root.worldBound.width, 600f, "세로 화면은 폰 폭 기준으로 배치(가로 1280 기준을 줄여 쓰지 않음)");
+            var screen = root.worldBound;
+            foreach (var name in new[] { "pause", "tool-place", "tool-paint", "tool-erase", "undo", "redo", "camera", "impossible", "submit", "view-top", "view-right", "timer" })
+            {
+                var e = ByName<VisualElement>(name).worldBound;
+                Assert.IsTrue(screen.Contains(e.min) && screen.Contains(e.max), name + " 화면 밖: " + e);
+                if (!name.StartsWith("view") && name != "timer") Assert.GreaterOrEqual(Mathf.Min(e.width, e.height), 44f - 1.5f, name + " 44px 미만"); // 실제 픽셀에 맞춰 반올림되므로 1픽셀 여유
+            }
+            for (int c = 1; c <= 6; c++)
+                if (editor.State.Puzzle.Counts[c] > 0)
+                {
+                    var chip = ByName<VisualElement>("color-" + c).worldBound;
+                    Assert.IsTrue(screen.Contains(chip.min) && screen.Contains(chip.max), "color-" + c);
+                }
+            yield return Save("ui-portrait-game.png");
+
+            editor.State.DeclareImpossible();
+            yield return null;
+            Assert.IsNotNull(ByName<VisualElement>("result"));
+            var popup = ByName<VisualElement>("result").worldBound;
+            Assert.IsTrue(screen.Contains(popup.min) && screen.Contains(popup.max), "결과 팝업이 화면 안");
+            yield return Resize(1280, 800);
+            Assert.IsFalse(ui.IsPortrait);
+            Assert.IsNotNull(ByName<VisualElement>("result"), "가로로 돌아와도 결과 팝업 유지");
+
+            yield return Resize(400, 800);
+            ui.Show(UiScreen.DifficultySelect);
+            yield return null;
+            yield return null;
+            screen = root.worldBound;
+            foreach (var name in new[] { "mode-sample", "mode-hard", "mode-back", "mode-code" })
+            {
+                var e = ByName<VisualElement>(name).worldBound;
+                Assert.IsTrue(screen.Contains(e.min) && screen.Contains(e.max), name + " 화면 밖");
+            }
+            Assert.AreEqual(ByName<VisualElement>("mode-sample").worldBound.y, ByName<VisualElement>("mode-easy").worldBound.y, 0.5f, "2×2: 연습·쉬움이 한 줄");
+            Assert.Greater(ByName<VisualElement>("mode-normal").worldBound.y, ByName<VisualElement>("mode-easy").worldBound.y + 1, "2×2: 보통은 다음 줄");
+            yield return Save("ui-portrait-mode.png");
+            ui.Show(UiScreen.Main);
+            yield return null;
+            yield return Save("ui-portrait-main.png");
         }
 
         [UnityTest]

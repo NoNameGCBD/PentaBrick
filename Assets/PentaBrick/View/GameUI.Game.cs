@@ -78,11 +78,12 @@ namespace PentaBrick.View
             var hud = Row(root);
             hud.pickingMode = PickingMode.Ignore;
             hud.style.alignItems = Align.FlexStart;
+            hud.style.flexWrap = Wrap.Wrap; // 세로 화면: 첫 줄 일시정지·시간, 둘째 줄 평면도 카드
             hud.style.paddingLeft = hud.style.paddingRight = hud.style.paddingTop = 10;
 
             var left = Row(hud);
             left.pickingMode = PickingMode.Ignore;
-            left.style.width = 140;
+            left.style.width = portrait ? Length.Percent(50) : 140;
             IconButton(left, "pause", Icon.Pause, "일시정지 (Esc)", OpenMenu);
 
             var cards = Row(hud);
@@ -94,7 +95,7 @@ namespace PentaBrick.View
 
             var right = Row(hud);
             right.pickingMode = PickingMode.Ignore;
-            right.style.width = 140;
+            right.style.width = portrait ? Length.Percent(50) : 140;
             right.style.justifyContent = Justify.FlexEnd;
             right.style.alignItems = Align.Center;
             right.style.height = 44;
@@ -103,6 +104,13 @@ namespace PentaBrick.View
             score.style.marginRight = 12;
             timeLabel = Text(right, "", 15);
             timeLabel.name = "timer";
+            if (portrait)
+            {
+                right.SendToBack(); // 순서: 일시정지 | 점수·시간 (첫 줄), 카드 (둘째 줄)
+                left.SendToBack();
+                cards.style.width = Length.Percent(100);
+                cards.style.marginTop = 6;
+            }
         }
 
         /// <summary>작은 평면도 카드. 누르면 그 방향으로 시점을 돌리고 크게 펼친다.</summary>
@@ -211,12 +219,14 @@ namespace PentaBrick.View
             tray.style.borderTopWidth = 1;
             tray.style.borderTopColor = LineColor;
 
+            VisualElement chips = null;
+            if (portrait) chips = Group(tray); // 세로 화면: 색 칩을 첫 줄에
             var tools = Group(tray);
             ToolButton(tools, "tool-place", Icon.Place, "놓기 (Q)", Tool.Place);
             ToolButton(tools, "tool-paint", Icon.Paint, "칠하기 (W)", Tool.Paint);
             ToolButton(tools, "tool-erase", Icon.Erase, "지우기 (E / 우클릭)", Tool.Erase);
 
-            var chips = Group(tray);
+            if (chips == null) chips = Group(tray);
             for (int color = 1; color <= Colors.Count; color++)
                 if (puzzle.Counts[color] > 0) ColorChip(chips, color);
 
@@ -260,6 +270,7 @@ namespace PentaBrick.View
             int remaining = state.Remaining(color);
             var chip = new Button(() => state.SetColor(color)) { name = "color-" + color, text = "", tooltip = $"{ColorNames[color]} ({color})" };
             chip.style.width = chip.style.height = 44;
+            chip.style.flexShrink = 0; // 줄이 좁아도 44px 터치 크기를 지킨다
             chip.style.marginLeft = chip.style.marginRight = 4;
             chip.style.paddingLeft = chip.style.paddingRight = chip.style.paddingTop = chip.style.paddingBottom = 0;
             chip.style.borderTopLeftRadius = chip.style.borderTopRightRadius = chip.style.borderBottomLeftRadius = chip.style.borderBottomRightRadius = 22;
@@ -290,6 +301,7 @@ namespace PentaBrick.View
             var button = new Button(onClick) { name = name, text = text };
             button.style.height = 44;
             button.style.paddingLeft = button.style.paddingRight = 16;
+            button.style.flexShrink = 0; // 줄이 좁아도 44px 터치 크기를 지킨다
             button.style.marginLeft = button.style.marginRight = 4;
             button.style.fontSize = 15;
             button.style.unityFontStyleAndWeight = FontStyle.Bold;

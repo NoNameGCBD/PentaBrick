@@ -57,6 +57,9 @@ namespace PentaBrick.View
         private bool settingsOpen; // Esc 메뉴 안의 설정
         private bool quitOpen;     // 메인 화면의 게임 종료 확인 창
         private bool codeOpen;     // 모드 선택의 문제 코드 창
+        private PanelSettings panelSettings;
+        private bool portrait;     // 세로 화면 배치
+        private const int PortraitWidth = 480; // 세로 화면의 논리 폭(이 폭에 맞춰 확대)
 
         // 전환 애니메이션. Build()가 매번 화면을 새로 만들므로 시작 시각만 기억하고 Update에서 시간으로 계산한다.
         private const float ScreenFade = 0.3f, ModalPop = 0.18f; // 초
@@ -94,6 +97,7 @@ namespace PentaBrick.View
             settings.referenceResolution = new Vector2Int(1280, 800);
             var document = gameObject.AddComponent<UIDocument>();
             document.panelSettings = settings;
+            panelSettings = settings;
 
             root = document.rootVisualElement;
             root.style.flexGrow = 1;
@@ -165,6 +169,9 @@ namespace PentaBrick.View
 
         /// <summary>모드 선택의 문제 코드 창이 떠 있는지.</summary>
         public bool IsCodeOpen => codeOpen;
+
+        /// <summary>세로 화면 배치인지(화면 높이가 폭보다 클 때).</summary>
+        public bool IsPortrait => portrait;
 
         /// <summary>펼친 평면도 카드의 방향. 없으면 null(기본 시점).</summary>
         public ViewDir? ExpandedView => expandedView;
@@ -389,6 +396,7 @@ namespace PentaBrick.View
 
         private void Update()
         {
+            CheckOrientation();
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) OnEscape();
             if (tutorial != null)
             {
@@ -415,6 +423,22 @@ namespace PentaBrick.View
             Rect full = root.worldBound, area = center.worldBound;
             if (full.width > 0 && area.width > 0 && Camera.main != null)
                 Camera.main.rect = new Rect(area.x / full.width, 1 - area.yMax / full.height, area.width / full.width, area.height / full.height);
+        }
+
+        /// <summary>
+        /// 가로/세로가 바뀌면 기준 폭을 바꾸고 다시 그린다. 세로는 폰 폭(480) 기준이라 버튼이 줄어들지 않고 줄을 바꾼다.
+        /// 패널 크기가 아니라 실제 화면(또는 캡처 텍스처) 크기로 판단한다(패널 크기는 이 기준 폭에 따라 바뀌므로).
+        /// </summary>
+        private void CheckOrientation()
+        {
+            var target = panelSettings.targetTexture;
+            int width = target != null ? target.width : Screen.width;
+            int height = target != null ? target.height : Screen.height;
+            bool now = height > width;
+            if (now == portrait) return;
+            portrait = now;
+            panelSettings.referenceResolution = portrait ? new Vector2Int(PortraitWidth, 800) : new Vector2Int(1280, 800);
+            dirty = true;
         }
 
         // ---------------------------------------------------------------
@@ -503,7 +527,7 @@ namespace PentaBrick.View
             root.Add(overlay);
 
             var box = new VisualElement();
-            box.style.width = width;
+            box.style.width = portrait ? Mathf.Min(width, PortraitWidth - 32) : width;
             box.style.backgroundColor = PanelColor;
             box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 20;
             box.style.borderTopLeftRadius = box.style.borderTopRightRadius = box.style.borderBottomLeftRadius = box.style.borderBottomRightRadius = 16;
@@ -582,6 +606,7 @@ namespace PentaBrick.View
         {
             var button = new Button(onClick) { name = name, tooltip = tooltip, text = "" };
             button.AddToClassList("icon-button");
+            button.style.flexShrink = 0; // 줄이 좁아도 44px 터치 크기를 지킨다
             button.style.width = button.style.height = size;
             button.style.paddingLeft = button.style.paddingRight = button.style.paddingTop = button.style.paddingBottom = 0;
             button.style.marginLeft = button.style.marginRight = 3;
