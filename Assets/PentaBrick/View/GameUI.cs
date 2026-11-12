@@ -422,7 +422,7 @@ namespace PentaBrick.View
             if (askTutorial && CurrentScreen == UiScreen.Main) BuildTutorialPrompt();
             if (quitOpen && CurrentScreen == UiScreen.Main) BuildQuitConfirm();
             // 새 창이 열렸을 때만 다시 튀어나오게 한다(같은 창이 다시 그려질 때는 이어서).
-            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : "menu";
+            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : menuOpen ? "menu" : "result";
             if (modal != builtModal)
             {
                 if (builtModal != null && previousOverlay != null)

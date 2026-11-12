@@ -296,6 +296,70 @@ namespace PentaBrick.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator 결과_팝업에서_다음_문제로_넘어간다()
+        {
+            ui.Play(null); // p1: 만들 수 있는 문제
+            yield return null;
+            var state = editor.State;
+            yield return ClickName("impossible"); // 틀린 불가능 선언
+            Assert.IsNotNull(ByName<VisualElement>("result"));
+            Assert.AreEqual(1, CountLabels("틀렸습니다, 만들 수 있는 문제"));
+            Assert.AreEqual(1, CountLabels("−2"));
+            Assert.AreNotEqual(Phase.Playing, state.Phase, "결과 중에는 편집 불가");
+            yield return Save("ui-result-popup.png");
+            var front = ByName<VisualElement>("view-front");
+            var picked = root.panel.Pick(front.worldBound.center);
+            Assert.IsTrue(picked == front || front.Contains(picked), "팝업이 떠 있어도 평면도 카드가 눌린다");
+            yield return ClickName("view-front");
+            Assert.AreEqual(ViewDir.Front, ui.ExpandedView, "결과 중에도 평면도 카드로 시점을 돌릴 수 있다");
+            yield return ClickName("result-answer");
+            Assert.IsTrue(state.ShowingAnswer);
+            Assert.IsNull(root.Q("tray"), "정답을 볼 때는 트레이를 숨김");
+            Assert.IsNull(root.Q("result-answer"), "이미 정답을 보는 중");
+            yield return Save("ui-result-answer.png");
+            yield return ClickName("result-next");
+            Assert.AreEqual("p2", state.Puzzle.Id);
+            Assert.AreEqual(Phase.Playing, state.Phase);
+            Assert.IsNull(ui.ExpandedView, "새 문제는 기본 시점");
+            Assert.IsNull(root.Q("result"));
+        }
+
+        [UnityTest]
+        public IEnumerator 오답이면_틀린_평면도_카드에_표시한다()
+        {
+            ui.Play(null);
+            yield return null;
+            var state = editor.State;
+            // 색 번호 순서대로 왼쪽 뒤 칸부터 채워 틀린 모형을 만든다.
+            int x = 0, z = 0;
+            for (int c = 1; c <= 6; c++)
+                for (int n = 0; n < state.Puzzle.Counts[c]; n++)
+                {
+                    state.SetColor(c);
+                    while (state.Model.Column(x, z).Count >= state.Puzzle.Height)
+                    {
+                        x++;
+                        if (x == state.Puzzle.Size) { x = 0; z++; }
+                    }
+                    state.Place(x, z);
+                }
+            Assert.IsTrue(state.CanSubmit);
+            yield return null;
+            yield return ClickName("submit");
+            Assert.IsFalse(state.Result.Correct, "이 채우기는 p1의 정답이 아니어야 한다");
+            Assert.AreEqual(1, CountLabels("오답"));
+            bool anyWrong = false;
+            for (int i = 0; i < 5; i++)
+            {
+                var card = ByName<VisualElement>("view-" + ((ViewDir)i).ToString().ToLowerInvariant());
+                Assert.AreEqual(!state.Result.ViewMatches[i], card.ClassListContains("wrong"), ((ViewDir)i).ToString());
+                anyWrong |= card.ClassListContains("wrong");
+            }
+            Assert.IsTrue(anyWrong);
+            yield return Save("ui-result-wrong.png");
+        }
+
+        [UnityTest]
         public IEnumerator 모든_아이콘을_그릴_수_있다()
         {
             // 메인 화면 위에 모든 아이콘을 한 줄로 붙이고 캡처한다.
@@ -547,7 +611,7 @@ namespace PentaBrick.PlayTests
             state.Submit();
             yield return null;
             yield return null;
-            Assert.AreEqual(1, Live<Label>().Where(l => l.text.StartsWith("정답입니다")).ToList().Count);
+            Assert.AreEqual(1, CountLabels("정답!"));
             Assert.AreEqual(1, CountLabels("점수 미반영 (내 모형의 평면도 표시를 켠 문제)"));
             yield return Save("ui-result.png");
         }

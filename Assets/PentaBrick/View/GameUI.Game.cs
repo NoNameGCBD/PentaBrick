@@ -68,18 +68,8 @@ namespace PentaBrick.View
             body.Add(center);
             if (expandedView != null) BuildExpandedView(expandedView.Value);
             if (tutorial != null) BuildTutorialCard();
-            if (state.Phase != Phase.Playing)
-            {
-                // shortcut: 결과 상자를 3D 화면 오른쪽 위에 임시로 띄움, Task 5에서 결과 팝업으로 교체
-                var box = new VisualElement();
-                box.style.position = Position.Absolute;
-                box.style.right = box.style.top = 12;
-                box.style.width = 300;
-                center.Add(box);
-                BuildResult(box);
-            }
-
-            BuildTray();
+            if (!state.ShowingAnswer) BuildTray(); // 정답 모형을 볼 때는 3D 화면을 넓게
+            if (state.Phase == Phase.Result) BuildResultPopup();
         }
 
         /// <summary>위쪽 HUD: 일시정지, 평면도 카드 다섯 장, 점수와 시간. 빈 곳은 3D 화면 클릭이 통과한다.</summary>
@@ -121,6 +111,7 @@ namespace PentaBrick.View
             var target = state.Puzzle.Views[(int)dir];
             bool match = state.ShowMine && Projection.ViewsEqual(mine, target); // 일치 여부는 힌트라 연습용 설정을 켰을 때만
             bool selected = expandedView == dir;
+            bool wrong = state.Phase == Phase.Result && state.Result.ViewMatches != null && !state.Result.ViewMatches[(int)dir];
             var card = new Button(() => ToggleView(dir)) { name = "view-" + dir.ToString().ToLowerInvariant(), text = "", tooltip = ViewHints[(int)dir] };
             card.style.flexDirection = FlexDirection.Column;
             card.style.alignItems = Align.Center;
@@ -129,8 +120,9 @@ namespace PentaBrick.View
             card.style.paddingLeft = card.style.paddingRight = card.style.paddingTop = card.style.paddingBottom = 4;
             card.style.backgroundColor = CardColor;
             card.style.borderTopLeftRadius = card.style.borderTopRightRadius = card.style.borderBottomLeftRadius = card.style.borderBottomRightRadius = 8;
-            Border(card, selected ? SelectColor : match ? GoodColor : LineColor, 2);
+            Border(card, wrong ? BadColor : selected ? SelectColor : match ? GoodColor : LineColor, 2);
             if (match) card.AddToClassList("match");
+            if (wrong) card.AddToClassList("wrong");
             if (selected) card.AddToClassList("selected");
             parent.Add(card);
             Text(card, ViewNames[(int)dir], 10, true, DimColor).style.marginBottom = 2;
@@ -309,56 +301,84 @@ namespace PentaBrick.View
             return button;
         }
 
-        /// <summary>결과 상자 (5.6).</summary>
-        private void BuildResult(VisualElement panel)
+        /// <summary>
+        /// 결과 팝업: 큰 제목과 점수, 다음 문제. 틀린 평면도는 위쪽 카드에 빨간 테두리로 보인다.
+        /// 정답 모형을 보는 중이거나 튜토리얼 중이면(안내 카드를 가리지 않게) 아래쪽 작은 띠로 접는다.
+        /// </summary>
+        private void BuildResultPopup()
         {
             var result = state.Result;
             var puzzle = state.Puzzle;
-            string title, detail;
-            if (!state.DeclaredImpossible && result.Correct)
-            {
-                title = "정답입니다";
-                detail = "다섯 평면도와 블록 수가 모두 일치합니다.";
-            }
-            else if (!state.DeclaredImpossible)
-            {
-                title = "오답입니다";
-                var wrong = new List<string>();
-                for (int i = 0; i < ViewNames.Length; i++) if (!result.ViewMatches[i]) wrong.Add(ViewNames[i]);
-                detail = wrong.Count > 0 ? "일치하지 않는 평면도: " + string.Join(", ", wrong) : "";
-                if (!result.CountsMatch) detail += (detail == "" ? "" : "\n") + "색별 블록 수 불일치";
-                if (!puzzle.Solvable) detail += "\n\n사실 불가능한 문제였습니다. " + puzzle.Reason;
-            }
-            else if (result.Correct)
-            {
-                title = "맞습니다, 불가능한 문제입니다";
-                detail = puzzle.Reason;
-            }
-            else
-            {
-                title = "틀렸습니다, 구현 가능한 문제입니다";
-                detail = "정답 모형을 확인해 보세요.";
-            }
-
-            var box = new VisualElement();
-            box.style.backgroundColor = CardColor;
-            box.style.marginTop = 10;
-            box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 10;
-            Border(box, result.Correct ? GoodColor : BadColor, 2);
-            panel.Add(box);
-
-            Text(box, title, 14, true, result.Correct ? GoodColor : BadColor);
-            string points = state.IsCustom ? "점수 미반영 (튜토리얼)"
-                : state.Unscored ? "점수 미반영 (내 모형의 평면도 표시를 켠 문제)"
-                : $"{(state.LastDelta > 0 ? "+" : state.LastDelta < 0 ? "−" : "")}{Math.Abs(state.LastDelta)}점" + (state.TimeBonus > 0 ? "  (시간 보너스 +1 포함)" : "");
-            Text(box, points, 13, true).style.marginTop = 2;
-            Text(box, detail, 12).style.marginTop = 4;
+            bool good = result.Correct;
+            string title = !state.DeclaredImpossible
+                ? (good ? "정답!" : "오답")
+                : (good ? "맞습니다, 불가능한 문제" : "틀렸습니다, 만들 수 있는 문제");
+            var notes = new List<string>();
+            if (state.TimeBonus > 0) notes.Add("시간 보너스 +1");
+            if (state.IsCustom) notes.Add("점수 미반영 (튜토리얼)");
+            else if (state.Unscored) notes.Add("점수 미반영 (내 모형의 평면도 표시를 켠 문제)");
+            if (state.DeclaredImpossible && good) notes.Add(puzzle.Reason);
+            if (!state.DeclaredImpossible && !good && !puzzle.Solvable) notes.Add("사실 불가능한 문제였습니다. " + puzzle.Reason);
             int seconds = (int)(state.ElapsedMs / 1000);
-            Text(box, $"소요 시간 {seconds / 60:00}:{seconds % 60:00}", 11, false, DimColor).style.marginTop = 4;
+            string points = $"{(state.LastDelta > 0 ? "+" : state.LastDelta < 0 ? "−" : "")}{Math.Abs(state.LastDelta)}";
+
+            if (state.ShowingAnswer || tutorial != null)
+            {
+                var holder = new VisualElement { pickingMode = PickingMode.Ignore };
+                holder.style.position = Position.Absolute;
+                holder.style.left = holder.style.right = 0;
+                holder.style.bottom = 12;
+                holder.style.alignItems = Align.Center;
+                center.Add(holder);
+                var strip = Row(holder);
+                strip.name = "result";
+                strip.style.alignItems = Align.Center;
+                strip.style.backgroundColor = PanelColor;
+                strip.style.paddingLeft = strip.style.paddingRight = 12;
+                strip.style.paddingTop = strip.style.paddingBottom = 8;
+                strip.style.borderTopLeftRadius = strip.style.borderTopRightRadius = strip.style.borderBottomLeftRadius = strip.style.borderBottomRightRadius = 12;
+                Border(strip, good ? GoodColor : BadColor, 2);
+                Text(strip, title, 15, true, good ? GoodColor : BadColor).style.marginRight = 10;
+                Text(strip, points, 15, true).style.marginRight = 12;
+                ResultButtons(strip);
+                return;
+            }
+
+            var box = Modal(360);
+            modalOverlay.pickingMode = PickingMode.Ignore; // 상자 밖은 통과: 평면도 카드와 카메라 회전은 그대로 쓴다
+            modalOverlay.style.backgroundColor = new Color(0, 0, 0, 0.35f);
+            box.name = "result";
+            box.style.alignItems = Align.Center;
+            box.style.borderTopLeftRadius = box.style.borderTopRightRadius = box.style.borderBottomLeftRadius = box.style.borderBottomRightRadius = 16;
+            Border(box, good ? GoodColor : BadColor, 2);
+            Text(box, title, 22, true, good ? GoodColor : BadColor);
+            Text(box, points, 40, true).style.marginTop = 4;
+            foreach (string note in notes)
+            {
+                var label = Text(box, note, 12, false, DimColor);
+                label.style.whiteSpace = WhiteSpace.Normal;
+                label.style.unityTextAlign = TextAnchor.MiddleCenter;
+                label.style.marginTop = 4;
+            }
+            Text(box, $"{seconds / 60:00}:{seconds % 60:00}", 11, false, DimColor).style.marginTop = 6;
             var buttons = Row(box);
-            buttons.style.marginTop = 6;
-            if (puzzle.Answer != null && !state.ShowingAnswer) Btn(buttons, "정답 모형 보기", state.ShowAnswer);
-            if (tutorial == null) Btn(buttons, "다음 문제", state.NewPuzzle); // 튜토리얼은 안내 카드로 진행한다
+            buttons.style.marginTop = 14;
+            buttons.style.alignItems = Align.Center;
+            ResultButtons(buttons);
+            if (codeMessage != "") Text(box, codeMessage, 11, false, DimColor).style.marginTop = 8;
+        }
+
+        /// <summary>결과의 버튼: 다음 문제(튜토리얼 제외), 정답 보기, 코드 복사, 메인.</summary>
+        private void ResultButtons(VisualElement parent)
+        {
+            if (tutorial == null)
+            {
+                var next = TrayButton(parent, "result-next", state.Mode == null ? "다음 샘플" : "다음 문제", state.NewPuzzle, GoodColor, Color.black);
+                next.style.marginRight = 8;
+            }
+            if (state.Puzzle.Answer != null && !state.ShowingAnswer) IconButton(parent, "result-answer", Icon.Eye, "정답 모형 보기", state.ShowAnswer);
+            if (state.Mode != null) IconButton(parent, "result-copy", Icon.Link, "문제 코드 복사", CopyShare);
+            IconButton(parent, "result-home", Icon.Home, "메인으로", () => Show(UiScreen.Main));
         }
     }
 }

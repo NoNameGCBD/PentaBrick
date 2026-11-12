@@ -56,17 +56,7 @@ namespace PentaBrick.View
                 () => LeavePuzzle("이 문제를 버리고 새 문제로 넘어가시겠습니까?", state.NewPuzzle));
             if (state.Mode != null)
             {
-                // WebGL에서는 같은 문제로 바로 들어오는 주소를, 그 밖에서는 문제 코드를 복사한다.
-                string page = Application.absoluteURL;
-                bool web = !string.IsNullOrEmpty(page);
-                string share = web
-                    ? $"{page.Split('?')[0]}?mode={DifficultySettings.Get(state.Mode.Value).Key}&seed={SeedCode.Encode(state.Puzzle.Seed.Value)}"
-                    : state.Puzzle.Id;
-                MenuButton(box, web ? "링크 복사" : "문제 코드 복사", () =>
-                {
-                    GUIUtility.systemCopyBuffer = share;
-                    codeMessage = "복사했습니다: " + share;
-                });
+                MenuButton(box, string.IsNullOrEmpty(Application.absoluteURL) ? "문제 코드 복사" : "링크 복사", CopyShare);
                 if (codeMessage != "") Text(box, codeMessage, 11, false, DimColor).style.marginBottom = 6;
             }
             MenuButton(box, "난이도 변경", () => LeavePuzzle("난이도 선택 화면으로 나가시겠습니까?", () => Show(UiScreen.DifficultySelect)));
@@ -77,6 +67,18 @@ namespace PentaBrick.View
             Text(box, "조작법", 12, true, DimColor).style.marginTop = 14;
             Text(box, "좌클릭: 선택한 도구 · 우클릭: 지우기 · 드래그: 회전 · 휠: 확대/축소\n" +
                 "1~6: 색 · Q/W/E: 놓기/칠하기/지우기 · Ctrl(⌘)+Z: 실행 취소 · Esc: 메뉴", 11, false, DimColor);
+        }
+
+        /// <summary>WebGL에서는 같은 문제로 바로 들어오는 주소를, 그 밖에서는 문제 코드를 복사한다.</summary>
+        private void CopyShare()
+        {
+            string page = Application.absoluteURL;
+            string share = !string.IsNullOrEmpty(page)
+                ? $"{page.Split('?')[0]}?mode={DifficultySettings.Get(state.Mode.Value).Key}&seed={SeedCode.Encode(state.Puzzle.Seed.Value)}"
+                : state.Puzzle.Id;
+            GUIUtility.systemCopyBuffer = share;
+            codeMessage = "복사했습니다: " + share;
+            dirty = true;
         }
 
         /// <summary>메뉴 창의 가로로 꽉 찬 버튼. 누른 뒤 메뉴를 다시 그린다.</summary>
