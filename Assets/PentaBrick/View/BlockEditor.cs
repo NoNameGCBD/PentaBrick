@@ -41,6 +41,7 @@ namespace PentaBrick.View
         private Vector2 pressPos;
         private bool dragging;
         private bool pressedOnScene; // UI 위에서 시작한 클릭은 3D 화면에 전달하지 않는다
+        private bool timerAligned;   // Unity 로고 화면이 끝난 뒤 풀이 시간을 한 번 다시 쟀는지
         private float pinchSpan;     // 지난 프레임 두 손가락 사이 거리(0이면 핀치 중 아님)
         private GameUI ui;
 
@@ -172,6 +173,12 @@ namespace PentaBrick.View
 
         private void Update()
         {
+            // 공유 주소로 들어오면 Awake에서 바로 문제가 시작되므로, 로고 화면 동안 흐른 시간을 풀이 시간에서 뺀다.
+            if (!timerAligned && UnityEngine.Rendering.SplashScreen.isFinished)
+            {
+                timerAligned = true;
+                State.ResetTimer();
+            }
             Keys();
 
             // Pointer는 마우스와 터치(첫 손가락)를 함께 다룬다. 휠·우클릭은 마우스, 핀치는 터치 전용.

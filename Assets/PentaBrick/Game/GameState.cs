@@ -139,6 +139,12 @@ namespace PentaBrick.Game
             Changed?.Invoke();
         }
 
+        /// <summary>풀이 시간을 지금부터 다시 잰다(풀이 중일 때만). 게임이 보이기 전 시간(Unity 로고 화면)을 빼는 데 쓴다.</summary>
+        public void ResetTimer()
+        {
+            if (Phase == Phase.Playing) startedAt = nowMs();
+        }
+
         // --- 편집 ---
 
         public void Place(int x, int z)

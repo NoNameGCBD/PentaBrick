@@ -44,6 +44,18 @@ namespace PentaBrick.Tests
         }
 
         [Test]
+        public void ResetTimer는_풀이_중에만_시간을_다시_잰다()
+        {
+            clock += 3000;
+            game.ResetTimer();
+            Assert.AreEqual(0, game.ElapsedMs);
+            clock += 1000;
+            game.DeclareImpossible();
+            game.ResetTimer(); // 결과 화면: 멈춘 시간 그대로
+            Assert.AreEqual(1000, game.ElapsedMs);
+        }
+
+        [Test]
         public void 놓기는_남은_개수를_줄이고_다_쓰면_거부한다()
         {
             game.SetColor(B); // p1의 파랑은 1개
