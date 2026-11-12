@@ -110,6 +110,9 @@ namespace PentaBrick.View
             root.style.color = TextColor;
             root.RegisterCallback<PointerOverEvent>(e => OnPointerOver(e.target as VisualElement), TrickleDown.TrickleDown);
             root.RegisterCallback<PointerOutEvent>(e => OnPointerOut(e.target as VisualElement), TrickleDown.TrickleDown);
+            // 버튼 소리: 마우스·터치(ClickEvent)와 키보드·게임패드(NavigationSubmitEvent) 모두
+            root.RegisterCallback<ClickEvent>(e => OnButtonPressed(e.target), TrickleDown.TrickleDown);
+            root.RegisterCallback<NavigationSubmitEvent>(e => OnButtonPressed(e.target), TrickleDown.TrickleDown);
             root.style.fontSize = 13;
             // shortcut: 한글 글꼴을 OS에서 빌려 쓴다(에디터·PC 빌드 전용), WebGL 빌드 전에 글꼴 파일을 프로젝트에 넣을 것
             var font = Font.CreateDynamicFontFromOSFont(new[] { "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR" }, 14);
@@ -123,6 +126,13 @@ namespace PentaBrick.View
                 Show(UiScreen.Intro); // 인트로 → (아무 버튼) → 메인. 첫 접속 안내는 메인에서 뜬다
                 askTutorial = PlayerPrefs.GetInt(TutorialSeenKey, 0) == 0;
             }
+        }
+
+        private void OnButtonPressed(IEventHandler target)
+        {
+            var element = target as VisualElement;
+            var button = element as Button ?? element?.GetFirstAncestorOfType<Button>();
+            if (button != null && button.enabledInHierarchy) GetComponent<Sfx>()?.Click();
         }
 
         private static void MarkTutorialSeen()

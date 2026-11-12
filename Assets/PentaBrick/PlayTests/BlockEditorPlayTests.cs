@@ -206,6 +206,23 @@ namespace PentaBrick.PlayTests
 
         /// <summary>버튼을 실제로 누른 것처럼 클릭 이벤트를 보내고 화면이 다시 그려지기를 기다린다.</summary>
         [UnityTest]
+        public IEnumerator 버튼_소리는_게임_효과음과_겹치지_않는다()
+        {
+            ui.Play(null);
+            yield return null;
+            var sfx = editor.GetComponent<Sfx>();
+            int before = sfx.ClicksPlayed;
+
+            yield return ClickName("camera"); // 상태가 안 바뀌는 버튼: 버튼 소리
+            Assert.AreEqual(before + 1, sfx.ClicksPlayed);
+
+            editor.State.Place(0, 0);
+            yield return null;
+            yield return ClickName("undo"); // 지우기 소리가 나므로 버튼 소리는 생략
+            Assert.AreEqual(before + 1, sfx.ClicksPlayed);
+        }
+
+        [UnityTest]
         public IEnumerator 풀던_중에_나가려고_하면_확인_창을_띄운다()
         {
             ui.Play(null);
