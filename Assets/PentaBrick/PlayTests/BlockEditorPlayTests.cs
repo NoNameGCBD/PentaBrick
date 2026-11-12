@@ -206,6 +206,33 @@ namespace PentaBrick.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator 메인_화면에서_Esc를_누르면_종료_확인_창을_띄운다()
+        {
+            Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
+            ui.OnEscape();
+            yield return null;
+            Assert.IsTrue(ui.IsQuitOpen);
+            yield return Save("ui-quit.png");
+
+            // "종료"는 에디터에서 플레이 모드를 끝내므로 누르지 않는다.
+            yield return Click("취소");
+            Assert.IsFalse(ui.IsQuitOpen);
+            Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
+
+            ui.OnEscape();
+            ui.OnEscape(); // 한 번 더 누르면 닫힌다
+            yield return null;
+            Assert.IsFalse(ui.IsQuitOpen);
+
+            // 게임 화면의 Esc는 그대로 메뉴를 연다.
+            ui.Play(null);
+            yield return null;
+            ui.OnEscape();
+            Assert.IsFalse(ui.IsQuitOpen);
+            Assert.IsTrue(ui.IsMenuOpen);
+        }
+
+        [UnityTest]
         public IEnumerator 인트로_애니메이션_뒤_아무_버튼으로_메인에_들어간다()
         {
             PlayerPrefs.DeleteKey(GameUI.TutorialSeenKey);

@@ -51,6 +51,7 @@ namespace PentaBrick.View
         private Action confirmAction;
         private bool menuOpen;     // Esc 메뉴
         private bool settingsOpen; // Esc 메뉴 안의 설정
+        private bool quitOpen;     // 메인 화면의 게임 종료 확인 창
         private const string VolumeKey = "volume";
         public const string TutorialSeenKey = "tutorialSeen"; // 튜토리얼을 하거나 건너뛰었으면 첫 접속 안내를 다시 띄우지 않는다
         private Tutorial tutorial;      // null이 아니면 튜토리얼 진행 중
@@ -139,12 +140,21 @@ namespace PentaBrick.View
         /// <summary>Esc 메뉴가 떠 있는지.</summary>
         public bool IsMenuOpen => menuOpen;
 
+        /// <summary>게임 종료 확인 창이 떠 있는지.</summary>
+        public bool IsQuitOpen => quitOpen;
+
         /// <summary>게임 화면에서 창이 하나도 안 떠 있을 때만 3D 편집과 단축키를 받는다.</summary>
         private void RefreshInput() => editor.enabled = CurrentScreen == UiScreen.Game && !menuOpen && !IsConfirming;
 
-        /// <summary>Esc: 떠 있는 창을 하나 닫고(확인 창 → 설정 → 메뉴), 아무것도 없으면 메뉴를 연다.</summary>
+        /// <summary>Esc: 메인 화면에서는 종료 확인 창을 열고 닫는다. 게임 화면에서는 떠 있는 창을 하나 닫고(확인 창 → 설정 → 메뉴), 아무것도 없으면 메뉴를 연다.</summary>
         public void OnEscape()
         {
+            if (CurrentScreen == UiScreen.Main && !askTutorial)
+            {
+                quitOpen = !quitOpen;
+                dirty = true;
+                return;
+            }
             if (CurrentScreen != UiScreen.Game) return;
             if (IsConfirming) CloseConfirm(false);
             else if (settingsOpen) settingsOpen = false;
@@ -290,7 +300,7 @@ namespace PentaBrick.View
             if (screen == UiScreen.Intro) introStart = Time.unscaledTime;
             if (screen != UiScreen.Game) EndTutorial();
             CurrentScreen = screen;
-            menuOpen = settingsOpen = false;
+            menuOpen = settingsOpen = quitOpen = false;
             RefreshInput();
             codeMessage = "";
             dirty = true;
@@ -373,6 +383,7 @@ namespace PentaBrick.View
             if (menuOpen) BuildMenu();
             if (IsConfirming) BuildConfirm();
             if (askTutorial && CurrentScreen == UiScreen.Main) BuildTutorialPrompt();
+            if (quitOpen && CurrentScreen == UiScreen.Main) BuildQuitConfirm();
         }
 
         /// <summary>첫 접속 때 튜토리얼을 할지 묻는 창.</summary>
@@ -531,6 +542,29 @@ namespace PentaBrick.View
             var leave = Btn(buttons, "나가기", () => CloseConfirm(true));
             leave.style.backgroundColor = BadColor;
             leave.style.color = Color.white;
+        }
+
+        /// <summary>메인 화면에서 Esc를 누르면 뜨는 게임 종료 확인 창.</summary>
+        private void BuildQuitConfirm()
+        {
+            var box = Modal(340);
+            Text(box, "게임을 종료하시겠습니까?", 16, true);
+            var buttons = Row(box);
+            buttons.style.marginTop = 16;
+            buttons.style.justifyContent = Justify.FlexEnd;
+            Btn(buttons, "취소", () => { quitOpen = false; dirty = true; });
+            var quit = Btn(buttons, "종료", Quit);
+            quit.style.backgroundColor = BadColor;
+            quit.style.color = Color.white;
+        }
+
+        private static void Quit()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false; // 에디터에서는 Application.Quit이 무시되므로 플레이 모드를 끝낸다
+#else
+            Application.Quit(); // WebGL에서는 아무 일도 일어나지 않는다
+#endif
         }
 
         /// <summary>메인 화면: 제목, 규칙 요약, 게임 시작.</summary>
