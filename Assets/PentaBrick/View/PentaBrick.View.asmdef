@@ -1,0 +1,6 @@
+{
+  "name": "PentaBrick.View",
+  "rootNamespace": "PentaBrick.View",
+  "references": ["PentaBrick.Core", "PentaBrick.Game", "Unity.InputSystem"],
+  "autoReferenced": true
+}

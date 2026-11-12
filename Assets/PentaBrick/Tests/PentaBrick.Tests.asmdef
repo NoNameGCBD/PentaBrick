@@ -1,0 +1,10 @@
+{
+  "name": "PentaBrick.Tests",
+  "rootNamespace": "PentaBrick.Tests",
+  "references": ["PentaBrick.Core", "PentaBrick.Game", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Unity를 열지 않고 Core 로직 테스트를 돌리기 위한 프로젝트.
+       Assets 안의 소스를 그대로 가져다 컴파일한다(복사본 없음).
+       실행: dotnet test unity/tools/dotnet-tests -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/PentaBrick/Core/**/*.cs" />
+    <Compile Include="../../Assets/PentaBrick/Game/**/*.cs" />
+    <Compile Include="../../Assets/PentaBrick/Tests/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+</Project>

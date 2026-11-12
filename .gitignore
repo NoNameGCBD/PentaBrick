@@ -1,0 +1,18 @@
+# Unity가 자동으로 만드는 폴더와 파일
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/*.csproj
+/*.sln
+/*.slnx
+.vscode/
+.idea/
+.DS_Store
+
+# 명령줄 테스트(tools/dotnet-tests)의 빌드 결과
+/tools/**/bin/
+/tools/**/obj/

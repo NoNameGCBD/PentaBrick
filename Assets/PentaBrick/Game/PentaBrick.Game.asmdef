@@ -1,0 +1,7 @@
+{
+  "name": "PentaBrick.Game",
+  "rootNamespace": "PentaBrick.Game",
+  "references": ["PentaBrick.Core"],
+  "noEngineReferences": true,
+  "autoReferenced": true
+}
