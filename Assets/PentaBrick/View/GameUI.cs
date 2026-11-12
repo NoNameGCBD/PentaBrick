@@ -325,6 +325,13 @@ namespace PentaBrick.View
         /// <summary>매 프레임 인트로 애니메이션을 진행하고, 아무 입력이나 들어오면 메인으로 넘어간다.</summary>
         private void UpdateIntro()
         {
+            // 빌드에서는 Unity 로고 화면이 덮고 있는 동안에도 Update가 돈다. 로고가 끝날 때까지 인트로를 0초에 붙잡아 둔다.
+            bool splash = !UnityEngine.Rendering.SplashScreen.isFinished;
+            if (splash)
+            {
+                introStart = Time.unscaledTime;
+                introPrev = -1;
+            }
             float t = IntroTime, prev = introPrev;
             introPrev = t;
             bool Crossed(float at) => prev < at && at <= t;
@@ -346,7 +353,7 @@ namespace PentaBrick.View
             // 나타난 뒤에는 1.2초 주기로 깜박인다.
             introPress.style.opacity = t < pressStart ? 0 : 0.2f + 0.8f * (0.5f + 0.5f * Mathf.Cos((t - pressStart) * Mathf.PI * 2 / 1.2f));
 
-            if (AnyInputPressed()) EnterMain();
+            if (!splash && AnyInputPressed()) EnterMain(); // 로고 중에 누른 입력으로 인트로를 건너뛰지 않는다
         }
 
         /// <summary>떨어져서 튀어 오르는 움직임(0 → 1).</summary>
