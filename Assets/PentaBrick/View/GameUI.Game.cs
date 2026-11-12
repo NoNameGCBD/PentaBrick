@@ -86,6 +86,9 @@ namespace PentaBrick.View
         private void BuildHud()
         {
             var hud = Row(root);
+            hud.name = "hud";
+            hud.style.backgroundColor = PageColor; // 3D 카메라가 그리지 않는 띠라 불투명해야 지난 프레임 글자가 남지 않는다
+            hud.style.paddingBottom = 8;
             hud.pickingMode = PickingMode.Ignore;
             hud.style.alignItems = Align.FlexStart;
             hud.style.flexWrap = Wrap.Wrap; // 세로 화면: 첫 줄 일시정지·시간, 둘째 줄 평면도 카드
