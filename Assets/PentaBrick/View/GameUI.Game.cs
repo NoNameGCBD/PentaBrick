@@ -68,8 +68,18 @@ namespace PentaBrick.View
             body.Add(center);
             if (expandedView != null) BuildExpandedView(expandedView.Value);
             if (tutorial != null) BuildTutorialCard();
+            if (state.Phase != Phase.Playing)
+            {
+                // shortcut: 결과 상자를 3D 화면 오른쪽 위에 임시로 띄움, Task 5에서 결과 팝업으로 교체
+                var box = new VisualElement();
+                box.style.position = Position.Absolute;
+                box.style.right = box.style.top = 12;
+                box.style.width = 300;
+                center.Add(box);
+                BuildResult(box);
+            }
 
-            BuildControls(Panel(body, 290));
+            BuildTray();
         }
 
         /// <summary>위쪽 HUD: 일시정지, 평면도 카드 다섯 장, 점수와 시간. 빈 곳은 3D 화면 클릭이 통과한다.</summary>
@@ -193,48 +203,110 @@ namespace PentaBrick.View
             dirty = true;
         }
 
-        /// <summary>조작 패널 (5.5, 5.6).</summary>
-        private void BuildControls(VisualElement panel)
+        /// <summary>아래 트레이: 도구 | 색 칩 | 실행 취소·다시 실행·기본 시점 | 불가능·제출.</summary>
+        private void BuildTray()
         {
             bool playing = state.Phase == Phase.Playing;
             var puzzle = state.Puzzle;
+            var tray = Row(root);
+            tray.name = "tray";
+            tray.style.backgroundColor = PanelColor;
+            tray.style.justifyContent = Justify.Center;
+            tray.style.alignItems = Align.Center;
+            tray.style.flexWrap = Wrap.Wrap;
+            tray.style.paddingTop = tray.style.paddingBottom = 8;
+            tray.style.paddingLeft = tray.style.paddingRight = 8;
+            tray.style.borderTopWidth = 1;
+            tray.style.borderTopColor = LineColor;
 
-            if (!playing) BuildResult(panel); // 결과는 스크롤하지 않아도 보이게 맨 위에
+            var tools = Group(tray);
+            ToolButton(tools, "tool-place", Icon.Place, "놓기 (Q)", Tool.Place);
+            ToolButton(tools, "tool-paint", Icon.Paint, "칠하기 (W)", Tool.Paint);
+            ToolButton(tools, "tool-erase", Icon.Erase, "지우기 (E / 우클릭)", Tool.Erase);
 
-            Header(panel, $"블록   사용 {state.UsedTotal} / {state.RequiredTotal}");
-            var palette = Row(panel);
-            palette.style.flexWrap = Wrap.Wrap;
+            var chips = Group(tray);
             for (int color = 1; color <= Colors.Count; color++)
-            {
-                int c = color;
-                var swatch = new Button(() => state.SetColor(c)) { text = $"{c} {ColorNames[c]}\n{state.Remaining(c)}/{puzzle.Counts[c]}" };
-                swatch.style.width = 80;
-                swatch.style.height = 42;
-                swatch.style.fontSize = 12;
-                swatch.style.color = Color.black;
-                swatch.style.backgroundColor = (Color)ColorValues[c];
-                Border(swatch, state.Color == c ? SelectColor : PanelColor, 3);
-                swatch.SetEnabled(puzzle.Counts[c] > 0); // 문제에 없는 색은 비활성
-                palette.Add(swatch);
-            }
+                if (puzzle.Counts[color] > 0) ColorChip(chips, color);
 
-            Header(panel, "도구");
-            var tools = Row(panel);
-            Btn(tools, "놓기 (Q)", () => state.SetTool(Tool.Place), state.Tool == Tool.Place);
-            Btn(tools, "칠하기 (W)", () => state.SetTool(Tool.Paint), state.Tool == Tool.Paint);
-            Btn(tools, "지우기 (E)", () => state.SetTool(Tool.Erase), state.Tool == Tool.Erase);
+            var edit = Group(tray);
+            IconButton(edit, "undo", Icon.Undo, "실행 취소 (Ctrl+Z)", state.Undo).SetEnabled(state.CanUndo);
+            IconButton(edit, "redo", Icon.Redo, "다시 실행 (Ctrl+Shift+Z)", state.Redo).SetEnabled(state.CanRedo);
+            IconButton(edit, "camera", Icon.Camera, "기본 시점", ResetView);
 
-            Header(panel, "편집");
-            var edit = Row(panel);
-            Btn(edit, "실행 취소", state.Undo).SetEnabled(state.CanUndo);
-            Btn(edit, "다시 실행", state.Redo).SetEnabled(state.CanRedo);
-            Btn(edit, "초기화", state.Reset).SetEnabled(playing && state.UsedTotal > 0);
+            var judge = Group(tray);
+            var impossible = TrayButton(judge, "impossible", "불가능", state.DeclareImpossible, CardColor, TextColor);
+            impossible.tooltip = "만들 수 없는 문제라고 선언 (맞으면 +2, 틀리면 −2)";
+            impossible.SetEnabled(playing);
+            var submit = TrayButton(judge, "submit", "제출", state.Submit, GoodColor, Color.black);
+            submit.tooltip = "블록을 모두 쓴 모형을 제출 (정답 +1, 오답 −1)";
+            submit.style.minWidth = 96;
+            submit.SetEnabled(state.CanSubmit);
+        }
 
-            Header(panel, "제출");
-            var submit = Row(panel);
-            Btn(submit, "정답 제출 (±1)", state.Submit).SetEnabled(state.CanSubmit);
-            Btn(submit, "불가능 (±2)", state.DeclareImpossible).SetEnabled(playing);
-            if (playing && !state.CanSubmit) Text(panel, "블록을 정확히 다 써야 제출할 수 있습니다.", 11, false, DimColor);
+        /// <summary>트레이 안의 묶음. 묶음 사이를 띄우고, 화면이 좁으면 묶음 단위로 줄을 바꾼다.</summary>
+        private static VisualElement Group(VisualElement tray)
+        {
+            var group = Row(tray);
+            group.style.alignItems = Align.Center;
+            group.style.marginLeft = group.style.marginRight = 10;
+            group.style.marginTop = group.style.marginBottom = 3;
+            return group;
+        }
+
+        private void ToolButton(VisualElement parent, string name, Icon icon, string tooltip, Tool tool)
+        {
+            var button = IconButton(parent, name, icon, tooltip, () => state.SetTool(tool));
+            if (state.Tool != tool) return;
+            button.AddToClassList("selected");
+            Border(button, SelectColor, 2);
+            button.style.backgroundColor = new Color(SelectColor.r, SelectColor.g, SelectColor.b, 0.25f);
+        }
+
+        /// <summary>색 칩: 동그란 색 버튼, 오른쪽 아래에 남은 개수.</summary>
+        private void ColorChip(VisualElement parent, int color)
+        {
+            int remaining = state.Remaining(color);
+            var chip = new Button(() => state.SetColor(color)) { name = "color-" + color, text = "", tooltip = $"{ColorNames[color]} ({color})" };
+            chip.style.width = chip.style.height = 44;
+            chip.style.marginLeft = chip.style.marginRight = 4;
+            chip.style.paddingLeft = chip.style.paddingRight = chip.style.paddingTop = chip.style.paddingBottom = 0;
+            chip.style.borderTopLeftRadius = chip.style.borderTopRightRadius = chip.style.borderBottomLeftRadius = chip.style.borderBottomRightRadius = 22;
+            chip.style.backgroundColor = (Color)ColorValues[color];
+            bool selected = state.Color == color;
+            Border(chip, selected ? Color.white : PanelColor, 3);
+            if (selected) chip.AddToClassList("selected");
+            if (remaining == 0) chip.style.opacity = 0.35f;
+            parent.Add(chip);
+
+            var badge = new Label(remaining.ToString()) { pickingMode = PickingMode.Ignore };
+            badge.style.position = Position.Absolute;
+            badge.style.right = -6;
+            badge.style.bottom = -6;
+            badge.style.minWidth = 20;
+            badge.style.fontSize = 11;
+            badge.style.unityFontStyleAndWeight = FontStyle.Bold;
+            badge.style.unityTextAlign = TextAnchor.MiddleCenter;
+            badge.style.color = TextColor;
+            badge.style.backgroundColor = new Color(0.08f, 0.09f, 0.11f, 1f);
+            badge.style.borderTopLeftRadius = badge.style.borderTopRightRadius = badge.style.borderBottomLeftRadius = badge.style.borderBottomRightRadius = 10;
+            badge.style.paddingLeft = badge.style.paddingRight = 4;
+            chip.Add(badge);
+        }
+
+        private static Button TrayButton(VisualElement parent, string name, string text, Action onClick, Color background, Color textColor)
+        {
+            var button = new Button(onClick) { name = name, text = text };
+            button.style.height = 44;
+            button.style.paddingLeft = button.style.paddingRight = 16;
+            button.style.marginLeft = button.style.marginRight = 4;
+            button.style.fontSize = 15;
+            button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            button.style.color = textColor;
+            button.style.backgroundColor = background;
+            button.style.borderTopLeftRadius = button.style.borderTopRightRadius = button.style.borderBottomLeftRadius = button.style.borderBottomRightRadius = 12;
+            Border(button, LineColor, 1);
+            parent.Add(button);
+            return button;
         }
 
         /// <summary>결과 상자 (5.6).</summary>

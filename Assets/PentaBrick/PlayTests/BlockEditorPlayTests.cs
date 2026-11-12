@@ -2,6 +2,7 @@ using System.Collections;
 using System.IO;
 using NUnit.Framework;
 using PentaBrick.Core;
+using PentaBrick.Game;
 using PentaBrick.View;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -260,6 +261,41 @@ namespace PentaBrick.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator 트레이에서_도구와_색을_고르고_제출한다()
+        {
+            ui.Play(null); // 샘플 p1
+            yield return null;
+            var state = editor.State;
+            Assert.AreEqual(0, Live<Label>().Where(l => l.text.StartsWith("블록 사용")).ToList().Count, "오른쪽 패널 소제목 없음");
+            for (int c = 1; c <= 6; c++) Assert.AreEqual(state.Puzzle.Counts[c] > 0, root.Q("color-" + c) != null, "문제에 있는 색만 칩: " + c);
+            yield return ClickName("tool-paint");
+            Assert.AreEqual(Tool.Paint, state.Tool);
+            Assert.IsTrue(ByName<VisualElement>("tool-paint").ClassListContains("selected"));
+            state.SetTool(Tool.Erase); // 단축키와 같은 경로
+            yield return null;
+            Assert.IsTrue(ByName<VisualElement>("tool-erase").ClassListContains("selected"), "단축키로 바꿔도 강조가 따라감");
+            Assert.IsFalse(ByName<VisualElement>("tool-paint").ClassListContains("selected"));
+            yield return ClickName("color-3");
+            Assert.AreEqual(3, state.Color);
+            Assert.IsTrue(ByName<VisualElement>("color-3").ClassListContains("selected"));
+            Assert.IsFalse(ByName<Button>("submit").enabledSelf);
+            Assert.IsFalse(ByName<Button>("undo").enabledSelf);
+            state.SetTool(Tool.Place);
+            state.Place(0, 0);
+            yield return null;
+            Assert.IsTrue(ByName<Button>("undo").enabledSelf);
+            yield return ClickName("undo");
+            Assert.AreEqual(0, state.UsedTotal);
+            Assert.IsTrue(ByName<Button>("redo").enabledSelf);
+            yield return ClickName("view-top");
+            yield return ClickName("camera");
+            Assert.IsNull(ui.ExpandedView, "카메라 아이콘은 기본 시점으로");
+            yield return Save("ui-tray.png");
+            yield return ClickName("impossible");
+            Assert.AreEqual(Phase.Result, state.Phase);
+        }
+
+        [UnityTest]
         public IEnumerator 모든_아이콘을_그릴_수_있다()
         {
             // 메인 화면 위에 모든 아이콘을 한 줄로 붙이고 캡처한다.
@@ -500,12 +536,10 @@ namespace PentaBrick.PlayTests
             Assert.IsTrue(Physics.Raycast(ray, out RaycastHit hit));
             Assert.AreEqual(new Vector3(1, 0.5f, -1), hit.transform.position);
 
-            // UI: 문제에 없는 색(p1의 주황·보라)은 비활성, 정답 모형이라 다섯 평면도 모두 일치.
-            var swatches = Live<Button>().Where(b => b.text.Contains("/")).ToList();
-            Assert.AreEqual(6, swatches.Count, "팔레트 6칸");
-            Assert.IsFalse(swatches[1].enabledSelf, "주황");
-            Assert.IsFalse(swatches[5].enabledSelf, "보라");
-            Assert.IsTrue(swatches[0].enabledSelf, "빨강");
+            // UI: 문제에 없는 색(p1의 주황·보라)은 칩이 없고, 정답 모형이라 다섯 평면도 모두 일치.
+            Assert.IsNull(root.Q("color-2"), "주황 칩 없음");
+            Assert.IsNull(root.Q("color-6"), "보라 칩 없음");
+            Assert.IsNotNull(ByName<Button>("color-1"), "빨강 칩");
             foreach (var dir in new[] { "top", "front", "back", "left", "right" })
                 Assert.IsTrue(ByName<VisualElement>("view-" + dir).ClassListContains("match"), dir);
             yield return Save("ui-game-sample.png");

@@ -526,25 +526,6 @@ namespace PentaBrick.View
             return row;
         }
 
-        private static ScrollView Panel(VisualElement parent, int width)
-        {
-            var panel = new ScrollView(); // 내용이 길면 스크롤
-            panel.style.width = width;
-            panel.style.flexShrink = 0;
-            panel.style.backgroundColor = PanelColor;
-            panel.contentContainer.style.paddingLeft = panel.contentContainer.style.paddingRight = 12;
-            panel.contentContainer.style.paddingBottom = 12;
-            parent.Add(panel);
-            return panel;
-        }
-
-        private static void Header(VisualElement parent, string text)
-        {
-            var label = Text(parent, text, 12, true, DimColor);
-            label.style.marginTop = 12;
-            label.style.marginBottom = 4;
-        }
-
         private static Label Text(VisualElement parent, string text, int size = 13, bool bold = false, Color? color = null)
         {
             var label = new Label(text);
