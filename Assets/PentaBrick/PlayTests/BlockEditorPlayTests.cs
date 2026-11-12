@@ -126,6 +126,17 @@ namespace PentaBrick.PlayTests
             for (int i = 0; i < 4; i++) yield return null;
         }
 
+        /// <summary>마우스가 요소 위로 들어오거나(true) 나간(false) 것처럼 포인터 이벤트를 보낸다.</summary>
+        private IEnumerator Hover(VisualElement element, bool over)
+        {
+            var system = new Event { type = EventType.MouseMove, mousePosition = element.worldBound.center };
+            if (over)
+                using (var e = PointerOverEvent.GetPooled(system)) { e.target = element; element.SendEvent(e); }
+            else
+                using (var e = PointerOutEvent.GetPooled(system)) { e.target = element; element.SendEvent(e); }
+            yield return null;
+        }
+
         private int CountLabels(string text) => Live<Label>().Where(l => l.text == text).ToList().Count;
         private int CountButtons(string start) => Live<Button>().Where(b => b.text.StartsWith(start)).ToList().Count;
 
@@ -274,6 +285,8 @@ namespace PentaBrick.PlayTests
             Assert.IsNull(root.Q("view-expanded"));
             Assert.IsNotNull(ByName<VisualElement>("score"));
             Assert.IsNotNull(ByName<VisualElement>("timer"));
+            // 3D 카메라는 가운데 영역에만 그리므로, HUD 띠가 투명하면 지난 프레임 글자(바뀌는 시간)가 지워지지 않고 겹친다.
+            Assert.AreEqual(1f, ByName<VisualElement>("hud").resolvedStyle.backgroundColor.a, 0.001f, "HUD 띠는 불투명");
             Assert.IsFalse(ByName<VisualElement>("view-top").ClassListContains("match"), "내 모형 평면도 표시를 끄면 일치 표시 없음");
             yield return ClickName("pause");
             Assert.IsTrue(ui.IsMenuOpen);
@@ -479,6 +492,42 @@ namespace PentaBrick.PlayTests
             Assert.IsTrue(ByName<Toggle>("settings-showmine").value, "켜 둔 설정이 그대로 보인다");
             ByName<Toggle>("settings-showmine").value = false;
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator 글자가_없는_버튼에_마우스를_올리면_이름이_뜬다()
+        {
+            ui.Play(null);
+            yield return new WaitForSecondsRealtime(0.4f);
+            var tip = ByName<Label>("tooltip");
+            Assert.AreEqual(DisplayStyle.None, tip.resolvedStyle.display, "처음에는 숨김");
+
+            var pause = ByName<Button>("pause");
+            yield return Hover(pause, true);
+            Assert.AreEqual(DisplayStyle.None, ByName<Label>("tooltip").resolvedStyle.display, "바로 뜨지 않고 잠깐 머물러야 뜬다");
+            yield return new WaitForSecondsRealtime(0.45f);
+            tip = ByName<Label>("tooltip");
+            Assert.AreEqual(DisplayStyle.Flex, tip.resolvedStyle.display);
+            Assert.AreEqual("일시정지 (Esc)", tip.text);
+            var screen = root.worldBound;
+            Assert.IsTrue(screen.Contains(tip.worldBound.min) && screen.Contains(tip.worldBound.max), "화면 왼쪽 끝 버튼이어도 툴팁이 화면 안: " + tip.worldBound);
+            Assert.GreaterOrEqual(tip.worldBound.yMin, pause.worldBound.yMax, "위쪽 버튼은 아래에 뜬다");
+            Assert.AreNotEqual(tip, tip.panel.Pick(tip.worldBound.center), "툴팁은 클릭을 가로채지 않는다");
+            yield return Save("ui-tooltip.png");
+            yield return Hover(pause, false);
+            Assert.AreEqual(DisplayStyle.None, ByName<Label>("tooltip").resolvedStyle.display, "벗어나면 숨김");
+
+            var chip = ByName<Button>("color-1");
+            yield return Hover(chip, true);
+            yield return new WaitForSecondsRealtime(0.45f);
+            tip = ByName<Label>("tooltip");
+            Assert.AreEqual("빨강 (1)", tip.text);
+            Assert.LessOrEqual(tip.worldBound.yMax, chip.worldBound.yMin, "아래쪽 버튼은 위에 뜬다");
+            Assert.IsTrue(screen.Contains(tip.worldBound.min) && screen.Contains(tip.worldBound.max));
+
+            yield return Hover(ByName<Button>("submit"), true); // 글자가 있는 버튼으로 옮기면
+            yield return new WaitForSecondsRealtime(0.45f);
+            Assert.AreEqual("블록을 모두 쓴 모형을 제출 (정답 +1, 오답 −1)", ByName<Label>("tooltip").text, "툴팁 문장이 있는 버튼은 모두 보여 준다");
         }
 
         [UnityTest]

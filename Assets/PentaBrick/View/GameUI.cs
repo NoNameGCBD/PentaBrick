@@ -69,6 +69,10 @@ namespace PentaBrick.View
         private string builtModal;
         private float modalStart = -10f;
         private VisualElement modalOverlay, modalBox;
+        private Label tooltipLabel;          // 마우스를 올린 버튼의 이름(런타임 패널은 tooltip 속성을 스스로 보여 주지 않는다)
+        private VisualElement tooltipOwner;
+        private IVisualElementScheduledItem tooltipTimer;
+        private const long TooltipDelayMs = 300;
         private bool resultPopupShown; // 결과 팝업(창 모양)을 그렸는지. 그 위에 일시정지가 떠도 결과 팝업은 남는다
         private VisualElement closingOverlay; // 방금 닫힌 창의 잔상. 클릭은 통과시키고 서서히 사라진다
         private float closeStart = -10f;
@@ -104,6 +108,8 @@ namespace PentaBrick.View
             root.style.flexGrow = 1;
             root.pickingMode = PickingMode.Ignore;
             root.style.color = TextColor;
+            root.RegisterCallback<PointerOverEvent>(e => OnPointerOver(e.target as VisualElement), TrickleDown.TrickleDown);
+            root.RegisterCallback<PointerOutEvent>(e => OnPointerOut(e.target as VisualElement), TrickleDown.TrickleDown);
             root.style.fontSize = 13;
             // shortcut: 한글 글꼴을 OS에서 빌려 쓴다(에디터·PC 빌드 전용), WebGL 빌드 전에 글꼴 파일을 프로젝트에 넣을 것
             var font = Font.CreateDynamicFontFromOSFont(new[] { "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR" }, 14);
@@ -492,7 +498,82 @@ namespace PentaBrick.View
             }
             // 잔상은 새 창 아래, 화면 위에 둔다. 다시 그려도 사라질 때까지 계속 붙인다.
             if (closingOverlay != null) root.Insert(root.IndexOf(screenCover) + 1, closingOverlay);
+            BuildTooltip();
             Animate();
+        }
+
+        // --- 툴팁: tooltip 문장이 달린 요소에 마우스를 잠깐 올리면 그 문장을 띄운다 ---
+
+        private void BuildTooltip()
+        {
+            tooltipTimer?.Pause();
+            tooltipOwner = null; // 다시 그리면 요소가 바뀌므로 마우스가 다시 들어올 때까지 숨긴다
+            tooltipLabel = new Label { name = "tooltip", pickingMode = PickingMode.Ignore };
+            tooltipLabel.style.position = Position.Absolute;
+            tooltipLabel.style.display = DisplayStyle.None;
+            tooltipLabel.style.fontSize = 12;
+            tooltipLabel.style.color = TextColor;
+            tooltipLabel.style.backgroundColor = new Color(0.06f, 0.07f, 0.09f, 0.95f);
+            tooltipLabel.style.paddingLeft = tooltipLabel.style.paddingRight = 8;
+            tooltipLabel.style.paddingTop = tooltipLabel.style.paddingBottom = 4;
+            tooltipLabel.style.borderTopLeftRadius = tooltipLabel.style.borderTopRightRadius = tooltipLabel.style.borderBottomLeftRadius = tooltipLabel.style.borderBottomRightRadius = 6;
+            root.Add(tooltipLabel); // 맨 위에 그려지도록 마지막에
+        }
+
+        /// <summary>요소나 그 부모 중 tooltip 문장이 달린 첫 요소(잔상 안은 제외).</summary>
+        private static VisualElement TooltipOwner(VisualElement element)
+        {
+            for (; element != null; element = element.parent)
+            {
+                if (element.ClassListContains(ClosingClass)) return null;
+                if (!string.IsNullOrEmpty(element.tooltip)) return element;
+            }
+            return null;
+        }
+
+        private void OnPointerOver(VisualElement target)
+        {
+            var owner = TooltipOwner(target);
+            if (owner == tooltipOwner) return;
+            HideTooltip();
+            if (owner == null || tooltipLabel == null) return;
+            tooltipOwner = owner;
+            tooltipTimer = tooltipLabel.schedule.Execute(() => ShowTooltip(owner)).StartingIn(TooltipDelayMs);
+        }
+
+        private void OnPointerOut(VisualElement target)
+        {
+            if (tooltipOwner != null && TooltipOwner(target) == tooltipOwner) HideTooltip(); // 안쪽 요소로 옮기면 Over가 다시 띄운다
+        }
+
+        private void HideTooltip()
+        {
+            tooltipTimer?.Pause();
+            tooltipOwner = null;
+            if (tooltipLabel != null) tooltipLabel.style.display = DisplayStyle.None;
+        }
+
+        /// <summary>화면 위쪽 절반의 버튼이면 아래에, 아래쪽이면 위에. 화면 가장자리 근처면 그쪽 끝에 맞춘다.</summary>
+        private void ShowTooltip(VisualElement owner)
+        {
+            if (owner.panel == null || owner != tooltipOwner) return;
+            Rect screen = root.worldBound, b = owner.worldBound;
+            var tip = tooltipLabel;
+            tip.text = owner.tooltip;
+            tip.style.left = tip.style.right = tip.style.top = tip.style.bottom = StyleKeyword.Auto;
+            tip.style.translate = new Translate(0, 0);
+            float center = b.center.x - screen.x;
+            const float edge = 160; // 툴팁 폭의 절반쯤: 이보다 가장자리에 가까우면 가운데 정렬 대신 끝에 맞춘다
+            if (center < edge) tip.style.left = Mathf.Max(4, b.xMin - screen.x);
+            else if (center > screen.width - edge) tip.style.right = Mathf.Max(4, screen.xMax - b.xMax);
+            else
+            {
+                tip.style.left = center;
+                tip.style.translate = new Translate(Length.Percent(-50), 0);
+            }
+            if (b.center.y - screen.y < screen.height / 2) tip.style.top = b.yMax - screen.y + 6;
+            else tip.style.bottom = screen.yMax - b.yMin + 6;
+            tip.style.display = DisplayStyle.Flex;
         }
 
         /// <summary>화면 전환(어두운 막이 걷힘)과 창 열기(서서히 나타나며 살짝 커짐)를 현재 시각에 맞춰 그린다.</summary>
