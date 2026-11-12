@@ -19,3 +19,6 @@
 
 # 브레인스토밍 시안
 /.superpowers/
+
+# WebGL 빌드가 프로젝트 루트에 남기는 Burst 중간 파일
+/Data/

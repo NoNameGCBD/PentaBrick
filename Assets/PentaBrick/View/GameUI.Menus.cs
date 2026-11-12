@@ -105,10 +105,8 @@ namespace PentaBrick.View
         private void CopyShare()
         {
             string page = Application.absoluteURL;
-            string share = !string.IsNullOrEmpty(page)
-                ? $"{page.Split('?')[0]}?mode={DifficultySettings.Get(state.Mode.Value).Key}&seed={SeedCode.Encode(state.Puzzle.Seed.Value)}"
-                : state.Puzzle.Id;
-            GUIUtility.systemCopyBuffer = share;
+            string share = !string.IsNullOrEmpty(page) ? page.Split('?')[0] + Web.Query(state) : state.Puzzle.Id;
+            Web.Copy(share);
             codeMessage = "복사했습니다: " + share;
             dirty = true;
         }

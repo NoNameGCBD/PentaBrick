@@ -116,9 +116,8 @@ namespace PentaBrick.View
             root.RegisterCallback<ClickEvent>(e => OnButtonPressed(e.target), TrickleDown.TrickleDown);
             root.RegisterCallback<NavigationSubmitEvent>(e => OnButtonPressed(e.target), TrickleDown.TrickleDown);
             root.style.fontSize = 13;
-            // shortcut: 한글 글꼴을 OS에서 빌려 쓴다(에디터·PC 빌드 전용), WebGL 빌드 전에 글꼴 파일을 프로젝트에 넣을 것
-            var font = Font.CreateDynamicFontFromOSFont(new[] { "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR" }, 14);
-            root.style.unityFontDefinition = FontDefinition.FromFont(font);
+            // 모든 빌드에 같은 한글 글꼴(Noto Sans KR, OFL: Resources/Fonts/NotoSansKR-OFL.txt). 굵은 글씨는 Unity가 굵게 그린다.
+            root.style.unityFontDefinition = FontDefinition.FromFont(Resources.Load<Font>("Fonts/NotoSansKR-Regular"));
             AudioListener.volume = PlayerPrefs.GetFloat(VolumeKey, 1f);
 
             // 공유 주소(?mode=&seed=)로 들어왔으면 메뉴를 건너뛰고 그 문제로 바로 들어간다.
@@ -210,7 +209,7 @@ namespace PentaBrick.View
                 dirty = true;
                 return;
             }
-            if (CurrentScreen == UiScreen.Main && !askTutorial)
+            if (CurrentScreen == UiScreen.Main && !askTutorial && !Web.IsBrowser) // 브라우저에서는 게임을 끌 수 없다
             {
                 quitOpen = !quitOpen;
                 dirty = true;

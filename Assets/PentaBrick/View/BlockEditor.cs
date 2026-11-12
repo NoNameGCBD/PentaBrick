@@ -72,6 +72,7 @@ namespace PentaBrick.View
                 if (State.Puzzle == shown) return;
                 shown = State.Puzzle;
                 SetView(null); // 새 문제는 기본 시점에서 시작
+                Web.SetQuery(Web.Query(State)); // 새로고침해도 같은 문제, 주소로 공유(웹판과 같음)
             };
             // WebGL에서 "?mode=normal&seed=1p0wp" 주소로 들어오면 그 문제로 시작한다.
             // shortcut: 점수는 게임을 끄면 사라진다, 점수 데이터베이스를 만들 때 여기서 불러오고 저장할 것
