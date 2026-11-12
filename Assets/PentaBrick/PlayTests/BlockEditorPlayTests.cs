@@ -95,6 +95,26 @@ namespace PentaBrick.PlayTests
             return true;
         }
 
+        /// <summary>잔상을 뺀 요소 중 이름이 같은 첫 요소. 없으면 실패.</summary>
+        private T ByName<T>(string name) where T : VisualElement
+        {
+            var element = Live<T>().Where(e => e.name == name).First();
+            if (element == null) Assert.Fail($"\"{name}\" 없음");
+            return element;
+        }
+
+        private IEnumerator ClickName(string name)
+        {
+            var button = ByName<Button>(name);
+            using (var submit = NavigationSubmitEvent.GetPooled())
+            {
+                submit.target = button;
+                button.SendEvent(submit);
+            }
+            yield return null;
+            yield return null;
+        }
+
         private int CountLabels(string text) => Live<Label>().Where(l => l.text == text).ToList().Count;
         private int CountButtons(string start) => Live<Button>().Where(b => b.text.StartsWith(start)).ToList().Count;
 
