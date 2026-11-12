@@ -89,9 +89,9 @@ namespace PentaBrick.View
                 PlayerPrefs.SetFloat(VolumeKey, change.newValue);
             });
             box.Add(volume);
-            var showMine = new Toggle("내 모형의 평면도 표시 (연습 모드 전용)") { name = "settings-showmine", value = state.ShowMine };
+            var showMine = new Toggle("내 모형의 평면도 표시 (연습 모드 전용)") { name = "settings-showmine", value = state.ShowMineSetting };
             showMine.RegisterValueChangedCallback(change => state.SetShowMine(change.newValue));
-            showMine.SetEnabled(state.Mode == null);
+            showMine.SetEnabled(CurrentScreen != UiScreen.Game || state.Mode == null); // 게임 밖에서는 언제든, 게임 중에는 연습 모드에서만
             showMine.style.marginTop = 8;
             box.Add(showMine);
             var reset = MenuButton(box, $"점수 초기화 (현재 {state.Score}점)", state.ResetScore);

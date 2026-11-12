@@ -61,6 +61,7 @@ namespace PentaBrick.View
             if (state.Puzzle != builtPuzzle)
             {
                 builtPuzzle = state.Puzzle;
+                codeMessage = ""; // 이전 문제의 "복사했습니다" 문장을 남기지 않는다
                 expandedView = null; // BlockEditor도 새 문제에서 기본 시점으로 돌아간다
             }
 
@@ -366,6 +367,7 @@ namespace PentaBrick.View
             }
 
             var box = Modal(360);
+            resultPopupShown = true;
             modalOverlay.pickingMode = PickingMode.Ignore; // 상자 밖은 통과: 평면도 카드와 카메라 회전은 그대로 쓴다
             modalOverlay.style.backgroundColor = new Color(0, 0, 0, 0.35f);
             box.name = "result";

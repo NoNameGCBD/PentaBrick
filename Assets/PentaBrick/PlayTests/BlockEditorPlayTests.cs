@@ -334,13 +334,13 @@ namespace PentaBrick.PlayTests
             yield return ClickName("result-answer");
             Assert.IsTrue(state.ShowingAnswer);
             Assert.IsNull(root.Q("tray"), "정답을 볼 때는 트레이를 숨김");
-            Assert.IsNull(root.Q("result-answer"), "이미 정답을 보는 중");
+            Assert.AreEqual(0, Live<Button>().Where(b => b.name == "result-answer").ToList().Count, "이미 정답을 보는 중");
             yield return Save("ui-result-answer.png");
             yield return ClickName("result-next");
             Assert.AreEqual("p2", state.Puzzle.Id);
             Assert.AreEqual(Phase.Playing, state.Phase);
             Assert.IsNull(ui.ExpandedView, "새 문제는 기본 시점");
-            Assert.IsNull(root.Q("result"));
+            Assert.AreEqual(0, Live<VisualElement>().Where(e => e.name == "result").ToList().Count, "결과가 닫힘(사라지는 잔상 제외)");
         }
 
         [UnityTest]
@@ -429,6 +429,56 @@ namespace PentaBrick.PlayTests
             ui.Show(UiScreen.Main);
             yield return null;
             yield return Save("ui-portrait-main.png");
+        }
+
+        [UnityTest]
+        public IEnumerator 결과_팝업은_창_애니메이션으로_열리고_닫힌다()
+        {
+            ui.Play(Difficulty.Easy);
+            yield return new WaitForSecondsRealtime(0.4f); // 화면 전환이 끝난 뒤
+            editor.State.DeclareImpossible();
+            yield return null;
+            yield return null;
+            var overlay = ByName<VisualElement>("result").parent;
+            Assert.Less(overlay.resolvedStyle.opacity, 0.99f, "열리는 중에는 서서히 나타난다");
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.AreEqual(1f, ByName<VisualElement>("result").parent.resolvedStyle.opacity, 0.01f);
+
+            yield return ClickName("pause"); // 일시정지가 결과 위에 떠도 결과 팝업은 그대로(잔상 없음)
+            Assert.AreEqual(0, root.Query(className: GameUI.ClosingClass).ToList().Count, "아래에 남는 결과 팝업은 사라지는 잔상이 아니다");
+            yield return ClickName("pause-resume");
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.AreEqual(1f, ByName<VisualElement>("result").parent.resolvedStyle.opacity, 0.01f, "일시정지를 닫으면 결과 팝업이 다시 튀어나오지 않는다");
+
+            yield return ClickName("result-copy");
+            Assert.AreEqual(1, Live<Label>().Where(l => l.text.StartsWith("복사했습니다")).ToList().Count);
+            yield return ClickName("result-next");
+            Assert.AreEqual(1, root.Query(className: GameUI.ClosingClass).ToList().Count, "닫힌 결과 팝업이 서서히 사라진다");
+            editor.State.DeclareImpossible();
+            yield return null;
+            yield return null;
+            Assert.AreEqual(0, Live<Label>().Where(l => l.text.StartsWith("복사했습니다")).ToList().Count, "이전 문제의 복사 문장이 남지 않는다");
+        }
+
+        [UnityTest]
+        public IEnumerator 메인에서_연_설정은_난이도_게임_뒤에도_내_모형_표시를_바꿀_수_있다()
+        {
+            ui.Play(Difficulty.Easy);
+            yield return null;
+            ui.Show(UiScreen.Main);
+            yield return null;
+            yield return ClickName("main-settings");
+            var toggle = ByName<Toggle>("settings-showmine");
+            Assert.IsTrue(toggle.enabledSelf, "게임 밖에서는 설정을 바꿀 수 있다");
+            toggle.value = true;
+            yield return null;
+            Assert.IsTrue(editor.State.ShowMineSetting);
+            ui.OnEscape();
+            yield return null;
+            yield return ClickName("main-settings");
+            Assert.IsTrue(ByName<Toggle>("settings-showmine").value, "켜 둔 설정이 그대로 보인다");
+            ByName<Toggle>("settings-showmine").value = false;
+            yield return null;
         }
 
         [UnityTest]

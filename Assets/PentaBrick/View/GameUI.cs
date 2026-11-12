@@ -69,6 +69,7 @@ namespace PentaBrick.View
         private string builtModal;
         private float modalStart = -10f;
         private VisualElement modalOverlay, modalBox;
+        private bool resultPopupShown; // 결과 팝업(창 모양)을 그렸는지. 그 위에 일시정지가 떠도 결과 팝업은 남는다
         private VisualElement closingOverlay; // 방금 닫힌 창의 잔상. 클릭은 통과시키고 서서히 사라진다
         private float closeStart = -10f;
         public const string ClosingClass = "closing";
@@ -448,6 +449,9 @@ namespace PentaBrick.View
         private void Build()
         {
             var previousOverlay = modalOverlay;
+            bool resultWasShown = resultPopupShown;
+            modalOverlay = modalBox = null; // 결과 팝업은 화면(게임) 안에서 만들어지므로 화면보다 먼저 비운다
+            resultPopupShown = false;
             root.Clear();
             if (builtScreen != CurrentScreen)
             {
@@ -465,7 +469,6 @@ namespace PentaBrick.View
             screenCover.style.backgroundColor = PageColor;
             root.Add(screenCover);
 
-            modalOverlay = modalBox = null;
             if (menuOpen) BuildMenu();
             if (settingsOpen) BuildSettings();
             if (codeOpen && CurrentScreen == UiScreen.DifficultySelect) BuildCodePopup();
@@ -476,15 +479,16 @@ namespace PentaBrick.View
             string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : settingsOpen ? "settings" : codeOpen ? "code" : menuOpen ? "menu" : "result";
             if (modal != builtModal)
             {
-                if (builtModal != null && previousOverlay != null)
+                bool resultStays = builtModal == "result" && resultPopupShown; // 결과 위에 다른 창이 뜬 것: 결과는 사라지지 않는다
+                if (builtModal != null && previousOverlay != null && !resultStays)
                 {
                     closingOverlay = previousOverlay;
                     closeStart = Time.unscaledTime;
                     closingOverlay.AddToClassList(ClosingClass);
                     closingOverlay.Query<VisualElement>().ForEach(e => e.pickingMode = PickingMode.Ignore);
                 }
+                if (!(modal == "result" && resultWasShown)) modalStart = Time.unscaledTime; // 위의 창이 닫혀 결과로 돌아올 때는 다시 튀어나오지 않는다
                 builtModal = modal;
-                modalStart = Time.unscaledTime;
             }
             // 잔상은 새 창 아래, 화면 위에 둔다. 다시 그려도 사라질 때까지 계속 붙인다.
             if (closingOverlay != null) root.Insert(root.IndexOf(screenCover) + 1, closingOverlay);
