@@ -14,20 +14,28 @@ namespace PentaBrick.View
         private void BuildTutorialCard()
         {
             var step = tutorial.Current;
-            var card = new VisualElement();
-            card.style.position = Position.Absolute;
-            card.style.top = 12;
-            card.style.left = card.style.right = 16;
+            // 3D 화면 위쪽 가운데. 평면도 카드를 펼쳤으면 그 아래로 내린다.
+            var holder = new VisualElement { pickingMode = PickingMode.Ignore };
+            holder.style.position = Position.Absolute;
+            holder.style.left = holder.style.right = 16;
+            holder.style.alignItems = Align.Center;
+            int expandedRows = expandedView == null ? 0 : state.Puzzle.Views[(int)expandedView.Value].GetLength(0);
+            holder.style.top = expandedView == null ? 12 : 8 + 28 * expandedRows + 60;
+            center.Add(holder);
+            var card = new VisualElement { name = "tutorial-card" };
+            card.style.width = Length.Percent(100);
+            card.style.maxWidth = 420;
             card.style.backgroundColor = PanelColor;
+            card.style.borderTopLeftRadius = card.style.borderTopRightRadius = card.style.borderBottomLeftRadius = card.style.borderBottomRightRadius = 14;
             card.style.paddingLeft = card.style.paddingRight = card.style.paddingTop = card.style.paddingBottom = 14;
             Border(card, SelectColor, 2);
-            center.Add(card);
+            holder.Add(card);
 
             var head = Row(card);
             head.style.alignItems = Align.Center;
             Text(head, $"튜토리얼 {tutorial.Index + 1} / {tutorial.Count}", 11, true, SelectColor).style.marginRight = 10;
             Text(head, step.Title, 16, true).style.flexGrow = 1;
-            Btn(head, "그만하기", () => Show(UiScreen.Main));
+            Btn(head, "그만하기", () => Show(UiScreen.Main)).name = "tutorial-stop";
             Text(card, step.Text, 13).style.marginTop = 6;
 
             var buttons = Row(card);
@@ -35,15 +43,16 @@ namespace PentaBrick.View
             if (tutorial.NeedsRetry(state))
             {
                 Text(buttons, "아쉽네요. 다시 해 보세요.  ", 12, true, BadColor);
-                Btn(buttons, "다시 하기", () => { tutorial.Retry(state); dirty = true; });
+                Btn(buttons, "다시 하기", () => { tutorial.Retry(state); dirty = true; }).name = "tutorial-retry";
             }
             else if (tutorial.IsLast)
             {
                 var play = Btn(buttons, "게임 시작하기", () => Show(UiScreen.DifficultySelect));
+                play.name = "tutorial-play";
                 play.style.backgroundColor = SelectColor;
                 play.style.color = Color.white;
             }
-            else if (step.IsManual) Btn(buttons, "다음 →", () => { tutorial.Next(state); dirty = true; });
+            else if (step.IsManual) Btn(buttons, "다음 →", () => { tutorial.Next(state); dirty = true; }).name = "tutorial-next";
             else Text(buttons, "▶ 직접 해 보세요", 12, true, DimColor);
         }
 

@@ -193,19 +193,6 @@ namespace PentaBrick.PlayTests
         }
 
         /// <summary>버튼을 실제로 누른 것처럼 클릭 이벤트를 보내고 화면이 다시 그려지기를 기다린다.</summary>
-        private IEnumerator Click(string text)
-        {
-            var button = Live<Button>().Where(b => b.text == text).First();
-            Assert.IsNotNull(button, $"\"{text}\" 버튼이 없음");
-            using (var submit = NavigationSubmitEvent.GetPooled())
-            {
-                submit.target = button;
-                button.SendEvent(submit);
-            }
-            yield return null;
-            yield return null;
-        }
-
         [UnityTest]
         public IEnumerator 풀던_중에_나가려고_하면_확인_창을_띄운다()
         {
@@ -551,7 +538,7 @@ namespace PentaBrick.PlayTests
             Assert.IsTrue(ui.IsAskingTutorial);
             Assert.AreEqual(1, CountButtons("튜토리얼 시작"));
             yield return Save("ui-tutorial-prompt.png");
-            yield return Click("건너뛰기");
+            yield return ClickName("tutorial-skip");
             Assert.IsFalse(ui.IsAskingTutorial);
             Assert.AreEqual(1, PlayerPrefs.GetInt(GameUI.TutorialSeenKey, 0));
 
@@ -564,24 +551,32 @@ namespace PentaBrick.PlayTests
         {
             PlayerPrefs.DeleteKey(GameUI.TutorialSeenKey);
             yield return Create();
-            yield return Click("튜토리얼 시작");
+            yield return ClickName("tutorial-start");
             Assert.IsTrue(ui.InTutorial);
             Assert.AreEqual(UiScreen.Game, ui.CurrentScreen);
             Assert.AreEqual(1, PlayerPrefs.GetInt(GameUI.TutorialSeenKey, 0), "튜토리얼을 시작하면 다시 묻지 않는다");
             Assert.AreEqual(1, CountLabels("튜토리얼 1 / 10"));
             Assert.IsTrue(editor.State.ShowMine, "튜토리얼에서는 내 모형 평면도를 보여 준다");
 
-            yield return Click("다음 →");
-            yield return Click("다음 →");
+            yield return ClickName("tutorial-next");
+            yield return ClickName("tutorial-next");
             Assert.AreEqual(1, CountLabels("블록 놓기"));
             Assert.AreEqual(1, CountLabels("▶ 직접 해 보세요"));
+            var card = ByName<VisualElement>("tutorial-card");
+            Assert.LessOrEqual(card.worldBound.width, 420.5f, "안내 카드는 화면 폭만큼 넓지 않다");
+            yield return ClickName("view-front");
+            var expanded = ByName<VisualElement>("view-expanded").worldBound;
+            card = ByName<VisualElement>("tutorial-card");
+            Assert.IsFalse(card.worldBound.Overlaps(expanded), "펼친 평면도와 안내 카드가 겹치지 않는다");
+            Assert.IsFalse(card.worldBound.Overlaps(ByName<VisualElement>("tray").worldBound), "안내 카드가 트레이를 가리지 않는다");
+            yield return ClickName("view-front");
             yield return Save("ui-tutorial.png");
             editor.State.Place(0, 0);
             yield return null;
             yield return null;
             Assert.AreEqual(1, CountLabels("쌓기"), "블록을 놓으면 다음 단계로");
 
-            yield return Click("그만하기");
+            yield return ClickName("tutorial-stop");
             Assert.IsFalse(ui.InTutorial);
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.IsFalse(editor.State.ShowMineSetting, "튜토리얼 전 설정(꺼짐)으로 돌아간다");

@@ -33,7 +33,7 @@ namespace PentaBrick.Game
         public static readonly Puzzle BuildPuzzle = Puzzle.FromModel("tutorial-1", Model.Parse(new[] { "BB R", ".  G" }));
 
         /// <summary>
-        /// 불가능한 문제: 초록 블록 하나뿐인데 전(앞) 평면도 왼쪽 아래 칸이 빨강이다.
+        /// 불가능한 문제: 초록 블록 하나뿐인데 앞 평면도 왼쪽 아래 칸이 빨강이다.
         /// </summary>
         public static readonly Puzzle ImpossiblePuzzle = MakeImpossible();
 
@@ -43,7 +43,7 @@ namespace PentaBrick.Game
             var views = Projection.ProjectAll(model);
             views[(int)ViewDir.Front][1, 0] = Colors.Red; // [row 1 = 바닥층, col 0 = 왼쪽]
             return new Puzzle("tutorial-2", model.Size, model.Height, views, model.CountColors(), solvable: false, answer: null,
-                reason: "전(앞) 평면도의 왼쪽 아래 칸은 빨강인데, 주어진 블록은 초록 1개뿐이라 빨강이 보일 수 없습니다.");
+                reason: "앞 평면도의 왼쪽 아래 칸은 빨강인데, 주어진 블록은 초록 1개뿐이라 빨강이 보일 수 없습니다.");
         }
 
         private static readonly TutorialStep[] AllSteps =
@@ -52,35 +52,35 @@ namespace PentaBrick.Game
                 "PentaBrick은 다섯 방향의 평면도를 보고 똑같은 블록 모형을 만드는 퍼즐입니다. 작은 2×2 문제로 규칙을 익혀 봅시다.",
                 BuildPuzzle),
             new TutorialStep("평면도 읽기",
-                "위쪽 카드 다섯 장은 정답 모형을 상(위)·전(앞)·후(뒤)·좌(왼쪽)·우(오른쪽)에서 본 모습입니다. " +
-                "각 칸에는 그 방향에서 가장 먼저 보이는 블록의 색이 나옵니다. 옆의 '내 모형'은 지금 만든 모형의 평면도입니다(연습 모드 전용).",
+                "위쪽 카드 다섯 장은 정답 모형을 위·앞·뒤·왼쪽·오른쪽에서 본 모습입니다. " +
+                "각 칸에는 그 방향에서 가장 먼저 보이는 블록의 색이 나옵니다. 카드를 누르면 크게 펼쳐지고, 옆에 지금 만든 모형의 평면도('내 모형')가 함께 보입니다(연습 모드 전용). 내 모형과 같아진 카드는 테두리가 초록색이 됩니다.",
                 BuildPuzzle),
             new TutorialStep("블록 놓기",
-                "오른쪽에서 색을 고르고(숫자 키 1~6) 가운데 바닥 칸을 클릭해 블록을 하나 놓아 보세요.",
+                "아래쪽 색 칩에서 색을 고르고(숫자 키 1~6) 가운데 바닥 칸을 클릭해 블록을 하나 놓아 보세요.",
                 BuildPuzzle, game => game.UsedTotal >= 1),
             new TutorialStep("쌓기",
                 "블록이 있는 칸을 클릭하면 그 위에 쌓입니다. 블록을 공중에 띄울 수는 없습니다. 한 칸에 블록 두 개를 쌓아 보세요.",
                 BuildPuzzle, HasStack),
             new TutorialStep("보는 방향 바꾸기와 고치기",
-                "드래그하면 회전, 휠로 확대·축소, 아래 시점 버튼으로 각 방향에서 볼 수 있습니다. " +
-                "우클릭이나 지우기 도구(E)로 블록을 지우고, 칠하기 도구(W)로 색을 바꾸며, Ctrl(⌘)+Z로 되돌립니다.",
+                "드래그하면 회전, 휠로 확대·축소합니다. 위쪽 평면도 카드를 누르면 그 방향에서 보고, 카메라 아이콘으로 돌아옵니다. " +
+                "우클릭이나 아래 지우기 도구(E)로 블록을 지우고, 칠하기 도구(W)로 색을 바꾸며, 되돌리기 아이콘이나 Ctrl(⌘)+Z로 되돌립니다.",
                 BuildPuzzle),
             new TutorialStep("모형 완성하기",
-                "다섯 평면도가 모두 '일치'가 되도록 만든 뒤 '정답 제출'을 누르세요. 주어진 블록은 남김없이 정확히 다 써야 제출할 수 있습니다.",
+                "위쪽 평면도 카드가 모두 초록 테두리가 되도록 만든 뒤 '제출'을 누르세요. 주어진 블록은 남김없이 정확히 다 써야 제출할 수 있습니다.",
                 BuildPuzzle, game => game.Phase == Phase.Result && !game.DeclaredImpossible && game.Result.Correct),
             new TutorialStep("점수",
                 "정답 제출은 맞으면 +1점, 틀리면 −1점입니다. 난이도 모드에서는 기준 시간 안에 맞히면 시간 보너스 +1점이 더해집니다. " +
                 "튜토리얼과 '내 모형의 평면도 표시'를 켠 연습 문제는 점수에 반영되지 않습니다.",
                 BuildPuzzle),
             new TutorialStep("불가능한 문제",
-                "어떤 문제는 평면도와 블록 수가 서로 맞지 않아 만들 수 없습니다. 전(앞) 평면도의 왼쪽 아래 칸을 보세요. " +
+                "어떤 문제는 평면도와 블록 수가 서로 맞지 않아 만들 수 없습니다. 앞 평면도의 왼쪽 아래 칸을 보세요. " +
                 "빨강이 보여야 하지만 주어진 블록은 초록 하나뿐입니다. 이럴 때는 '불가능'을 누릅니다.",
                 ImpossiblePuzzle, game => game.Phase == Phase.Result && game.DeclaredImpossible && game.Result.Correct),
             new TutorialStep("불가능 선언",
                 "불가능 선언은 맞으면 +2점, 틀리면 −2점입니다. 확신이 들 때만 누르세요. 난이도 모드 문제 중 일부(10~20%)는 불가능한 문제입니다.",
                 ImpossiblePuzzle),
             new TutorialStep("준비 완료",
-                "이제 난이도를 골라 시작해 보세요. 게임 중 Esc를 누르면 메뉴에서 튜토리얼을 다시 볼 수 있습니다.",
+                "이제 난이도를 골라 시작해 보세요. 게임 중 Esc나 일시정지 버튼을 누르면 튜토리얼을 다시 볼 수 있습니다.",
                 ImpossiblePuzzle),
         };
 

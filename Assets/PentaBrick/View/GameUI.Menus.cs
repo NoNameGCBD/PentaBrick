@@ -20,8 +20,9 @@ namespace PentaBrick.View
             var buttons = Row(box);
             buttons.style.marginTop = 16;
             buttons.style.justifyContent = Justify.FlexEnd;
-            Btn(buttons, "건너뛰기", SkipTutorial);
+            Btn(buttons, "건너뛰기", SkipTutorial).name = "tutorial-skip";
             var start = Btn(buttons, "튜토리얼 시작", StartTutorial);
+            start.name = "tutorial-start";
             start.style.backgroundColor = SelectColor;
             start.style.color = Color.white;
         }
