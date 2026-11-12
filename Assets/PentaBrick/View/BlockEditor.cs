@@ -26,6 +26,8 @@ namespace PentaBrick.View
 
         private const float DragThreshold = 5f; // 이만큼(px) 움직이면 클릭이 아니라 회전으로 본다
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+        // CreatePrimitive의 기본 머티리얼은 씬에서 참조하지 않아 빌드에서 빠진다(보라색). Resources에 두면 항상 포함된다.
+        private Material blockMaterial;
 
         public GameState State { get; private set; }
         /// <summary>카메라 회전·거리(테스트가 조작 결과를 확인하는 데 쓴다).</summary>
@@ -57,7 +59,9 @@ namespace PentaBrick.View
         private void Awake()
         {
             cam = Camera.main;
+            blockMaterial = Resources.Load<Material>("Block");
             ghost = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
+            ghost.GetComponent<Renderer>().sharedMaterial = blockMaterial;
             ghost.name = "Ghost";
             ghost.SetParent(transform);
             Destroy(ghost.GetComponent<Collider>()); // 미리보기가 클릭을 가로채면 안 된다
@@ -128,6 +132,7 @@ namespace PentaBrick.View
         private Transform Cube(Vector3 pos, int color)
         {
             var cube = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
+            cube.GetComponent<Renderer>().sharedMaterial = blockMaterial;
             cube.SetParent(blocks);
             cube.position = pos;
             cube.localScale = Vector3.one * 0.96f; // 블록 사이에 틈이 보이게

@@ -912,6 +912,8 @@ namespace PentaBrick.PlayTests
 
             Assert.IsTrue(state.CanSubmit);
             Assert.AreEqual(9 + 7, editor.transform.Find("Blocks").childCount, "바닥 9칸 + 블록 7개");
+            foreach (var r in editor.GetComponentsInChildren<Renderer>(true))
+                Assert.AreEqual("Block", r.sharedMaterial.name, $"{r.name}: 빌드에 포함되는 Resources 머티리얼이어야 한다(기본 머티리얼은 빌드에서 보라색)");
 
             // 앞-오른쪽 칸(x=2, z=2)의 노랑 블록은 월드 (1, 0.5, -1)에 있어야 하고 화면에서 클릭된다.
             var cam = Camera.main;
