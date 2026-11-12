@@ -16,3 +16,6 @@
 # 명령줄 테스트(tools/dotnet-tests)의 빌드 결과
 /tools/**/bin/
 /tools/**/obj/
+
+# 브레인스토밍 시안
+/.superpowers/
