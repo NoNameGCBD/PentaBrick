@@ -2,3 +2,23 @@
 
 /* 아이콘 버튼은 비활성일 때 더 흐리게 */
 .icon-button:disabled { opacity: 0.35; }
+
+/* 버튼 강조. 루트에 .mouse(PC) 또는 .touch(모바일)가 붙는다(GameUI.Start).
+   버튼 색은 인라인 스타일이라 여기서 바꿀 수 없어서, 흰 배경 그림을 덮고 그 틴트의 투명도로 밝힌다.
+   눌림은 빠르게 들어가고(0.05초) 놓으면 천천히 돌아온다(기본 0.18초). */
+Button {
+    background-image: resource("ButtonLight");
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0);
+    transition-property: scale, -unity-background-image-tint-color;
+    transition-duration: 0.18s;
+    transition-timing-function: ease-out-cubic;
+}
+.mouse Button:hover:enabled {
+    scale: 1.06 1.06;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.1);
+}
+Button:active:enabled {
+    scale: 0.93 0.93;
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.22);
+    transition-duration: 0.05s;
+}

@@ -108,6 +108,8 @@ namespace PentaBrick.View
             root.style.flexGrow = 1;
             root.pickingMode = PickingMode.Ignore;
             root.style.color = TextColor;
+            // 버튼 강조 방식(PentaBrickTheme.tss): 마우스는 올리면 커지고 밝아짐, 터치는 누르는 순간 눌림 표시만
+            root.AddToClassList(Application.isMobilePlatform ? "touch" : "mouse");
             root.RegisterCallback<PointerOverEvent>(e => OnPointerOver(e.target as VisualElement), TrickleDown.TrickleDown);
             root.RegisterCallback<PointerOutEvent>(e => OnPointerOut(e.target as VisualElement), TrickleDown.TrickleDown);
             // 버튼 소리: 마우스·터치(ClickEvent)와 키보드·게임패드(NavigationSubmitEvent) 모두

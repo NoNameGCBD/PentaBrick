@@ -269,6 +269,19 @@ namespace PentaBrick.PlayTests
         }
 
         [UnityTest]
+        public IEnumerator 버튼은_평소에_원래_색이고_강조_준비가_되어_있다()
+        {
+            Assert.IsTrue(root.ClassListContains("mouse"), "PC에서는 마우스 강조 방식");
+            foreach (var b in Live<Button>().ToList())
+            {
+                Assert.IsNotNull(b.resolvedStyle.backgroundImage.texture, $"{b.name} 강조용 배경 그림(스타일 시트 적용)");
+                Assert.AreEqual(0f, b.resolvedStyle.unityBackgroundImageTintColor.a, $"{b.name} 평소에는 투명");
+            }
+            // shortcut: 실제 :hover 전환은 배치 모드(창 포커스 없음)에서 UI가 마우스를 무시해 확인 못 함, 에디터에서 눈으로 확인
+            yield break;
+        }
+
+        [UnityTest]
         public IEnumerator 풀던_중에_나가려고_하면_확인_창을_띄운다()
         {
             ui.Play(null);
