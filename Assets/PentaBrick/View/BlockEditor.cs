@@ -28,6 +28,9 @@ namespace PentaBrick.View
         private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
 
         public GameState State { get; private set; }
+        /// <summary>카메라 회전·거리(테스트가 조작 결과를 확인하는 데 쓴다).</summary>
+        public float Yaw => yaw;
+        public float Distance => distance;
 
         private Camera cam;
         private Transform blocks; // 바닥 칸과 블록의 부모. 상태가 바뀌면 통째로 다시 만든다
@@ -36,6 +39,7 @@ namespace PentaBrick.View
         private Vector2 pressPos;
         private bool dragging;
         private bool pressedOnScene; // UI 위에서 시작한 클릭은 3D 화면에 전달하지 않는다
+        private float pinchSpan;     // 지난 프레임 두 손가락 사이 거리(0이면 핀치 중 아님)
         private GameUI ui;
 
         private void Start() => ui = GetComponent<GameUI>();
@@ -164,27 +168,34 @@ namespace PentaBrick.View
         {
             Keys();
 
-            var mouse = Mouse.current;
-            if (mouse == null) return;
-            Vector2 pos = mouse.position.ReadValue();
+            // Pointer는 마우스와 터치(첫 손가락)를 함께 다룬다. 휠·우클릭은 마우스, 핀치는 터치 전용.
+            var pointer = Pointer.current;
+            if (pointer == null) return;
+            bool touch = pointer is Touchscreen;
+            var mouse = touch ? null : Mouse.current;
+            Vector2 pos = pointer.position.ReadValue();
 
             bool overUi = ui != null && ui.IsPointerOverUI(pos);
 
-            float scroll = mouse.scroll.ReadValue().y;
+            float scroll = mouse != null ? mouse.scroll.ReadValue().y : 0;
             if (scroll != 0 && !overUi) distance = Mathf.Clamp(distance * (scroll > 0 ? 0.9f : 1.1f), 3, 40);
 
-            if (mouse.leftButton.wasPressedThisFrame)
+            if (touch && Pinch((Touchscreen)pointer)) pressedOnScene = false; // 두 번째 손가락이 닿으면 탭·회전 취소
+
+            if (pointer.press.wasPressedThisFrame)
             {
                 pressPos = pos;
                 dragging = false;
                 pressedOnScene = !overUi;
             }
-            if (mouse.leftButton.isPressed && pressedOnScene)
+            if (pointer.press.isPressed && pressedOnScene)
             {
-                if ((pos - pressPos).magnitude > DragThreshold) dragging = true;
+                // 손가락은 탭하는 동안에도 흔들리므로 터치는 더 많이 움직여야 회전으로 본다(약 2mm).
+                float threshold = touch ? Mathf.Max(DragThreshold * 3, Screen.dpi * 0.08f) : DragThreshold;
+                if ((pos - pressPos).magnitude > threshold) dragging = true;
                 if (dragging)
                 {
-                    Vector2 delta = mouse.delta.ReadValue();
+                    Vector2 delta = pointer.delta.ReadValue();
                     yaw += delta.x * 0.4f;
                     pitch = Mathf.Clamp(pitch - delta.y * 0.4f, 0, 90); // 바닥 아래로는 내려가지 않는다
                 }
@@ -197,7 +208,8 @@ namespace PentaBrick.View
             // 미리보기: 놓기 도구일 때 블록이 놓일 자리
             int top = hasHit ? State.Model.Column(cell.x, cell.z).Count : 0;
             bool canPlace = hasHit && !dragging && State.Phase == Phase.Playing && State.Tool == Tool.Place
-                && State.Remaining(State.Color) > 0 && top < State.Puzzle.Height;
+                && State.Remaining(State.Color) > 0 && top < State.Puzzle.Height
+                && (!touch || (pointer.press.isPressed && pressedOnScene)); // 터치는 마우스 올리기가 없어 누르는 동안만
             ghost.gameObject.SetActive(canPlace);
             if (canPlace)
             {
@@ -206,16 +218,37 @@ namespace PentaBrick.View
             }
 
             if (!hasHit) return;
-            if (mouse.rightButton.wasPressedThisFrame)
+            if (mouse != null && mouse.rightButton.wasPressedThisFrame)
             {
                 State.Erase(cell.x, cell.y, cell.z);
             }
-            else if (mouse.leftButton.wasReleasedThisFrame && !dragging && pressedOnScene)
+            else if (pointer.press.wasReleasedThisFrame && !dragging && pressedOnScene)
             {
                 if (State.Tool == Tool.Place) State.Place(cell.x, cell.z);
                 else if (State.Tool == Tool.Paint) State.Paint(cell.x, cell.y, cell.z);
                 else State.Erase(cell.x, cell.y, cell.z);
             }
+        }
+
+        /// <summary>두 손가락 핀치로 확대·축소한다. 두 손가락이 닿아 있으면 true.</summary>
+        private bool Pinch(Touchscreen screen)
+        {
+            Vector2? first = null, second = null;
+            foreach (var t in screen.touches)
+            {
+                if (!t.isInProgress) continue;
+                if (first == null) first = t.position.ReadValue();
+                else { second = t.position.ReadValue(); break; }
+            }
+            if (second == null)
+            {
+                pinchSpan = 0;
+                return false;
+            }
+            float span = (first.Value - second.Value).magnitude;
+            if (pinchSpan > 0 && span > 0) distance = Mathf.Clamp(distance * pinchSpan / span, 3, 40); // 벌리면 가까이
+            pinchSpan = span;
+            return true;
         }
 
         private void Keys()

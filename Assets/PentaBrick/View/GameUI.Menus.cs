@@ -52,8 +52,10 @@ namespace PentaBrick.View
             IconButton(icons, "pause-home", Icon.Home, "메인으로", () => LeavePuzzle("메인 메뉴로 나가시겠습니까?", () => Show(UiScreen.Main)));
             if (codeMessage != "") Text(box, codeMessage, 11, false, DimColor).style.marginTop = 6;
 
-            var help = Text(box, "좌클릭: 선택한 도구 · 우클릭: 지우기 · 드래그: 회전 · 휠: 확대/축소\n" +
-                "1~6: 색 · Q/W/E: 놓기/칠하기/지우기 · Ctrl(⌘)+Z: 실행 취소", 10, false, DimColor);
+            var help = Text(box, Application.isMobilePlatform
+                ? "탭: 선택한 도구 · 한 손가락 드래그: 회전 · 두 손가락 벌리기/모으기: 확대/축소"
+                : "좌클릭: 선택한 도구 · 우클릭: 지우기 · 드래그: 회전 · 휠: 확대/축소\n" +
+                  "1~6: 색 · Q/W/E: 놓기/칠하기/지우기 · Ctrl(⌘)+Z: 실행 취소", 10, false, DimColor);
             help.style.marginTop = 14;
             help.style.whiteSpace = WhiteSpace.Normal;
             help.style.unityTextAlign = TextAnchor.MiddleCenter;

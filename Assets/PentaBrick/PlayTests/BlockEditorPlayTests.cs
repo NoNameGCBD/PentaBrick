@@ -224,15 +224,74 @@ namespace PentaBrick.PlayTests
             Assert.AreEqual(before + 1, sfx.ClicksPlayed);
         }
 
-        [UnityTest]
-        public IEnumerator 게임_화면의_단축키도_버튼_소리를_낸다()
+        /// <summary>
+        /// 배치 모드는 창에 포커스가 없어 기본 설정이면 입력이 버려진다. 복사본 설정으로 바꾸고, 돌려준 함수로 되돌린다.
+        /// </summary>
+        private static System.Action AcceptUnfocusedInput()
         {
-            // 배치 모드는 창에 포커스가 없어 기본 설정이면 입력이 버려진다. 복사본 설정으로 바꿨다가 되돌린다.
             var original = InputSystem.settings;
             var settings = Object.Instantiate(original);
             settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
             settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
             InputSystem.settings = settings;
+            return () => { InputSystem.settings = original; Object.Destroy(settings); };
+        }
+
+        [UnityTest]
+        public IEnumerator 터치_탭은_놓고_드래그는_돌리고_핀치는_확대한다()
+        {
+            ui.Play(null);
+            yield return null;
+            var state = editor.State;
+            var restore = AcceptUnfocusedInput();
+            var touch = InputSystem.AddDevice<Touchscreen>();
+            try
+            {
+                IEnumerator Touch(int id, UnityEngine.InputSystem.TouchPhase phase, Vector2 pos)
+                {
+                    InputSystem.QueueStateEvent(touch, new TouchState { touchId = id, phase = phase, position = pos });
+                    yield return null;
+                }
+                // 가운데 바닥 칸(p1은 3×3, 가운데 칸 윗면이 월드 원점)
+                Vector2 center = Camera.main.WorldToScreenPoint(Vector3.zero);
+
+                // 탭: 놓기
+                yield return Touch(1, UnityEngine.InputSystem.TouchPhase.Began, center);
+                Assert.IsTrue(editor.transform.Find("Ghost").gameObject.activeSelf, "누르고 있는 동안 미리보기");
+                yield return Touch(1, UnityEngine.InputSystem.TouchPhase.Ended, center);
+                Assert.AreEqual(1, state.UsedTotal, "탭하면 놓인다");
+                yield return null;
+                Assert.IsFalse(editor.transform.Find("Ghost").gameObject.activeSelf, "떼면 미리보기를 숨긴다");
+
+                // 드래그: 돌리기만, 놓지 않는다
+                float yaw = editor.Yaw;
+                yield return Touch(2, UnityEngine.InputSystem.TouchPhase.Began, center);
+                for (int i = 1; i <= 5; i++) yield return Touch(2, UnityEngine.InputSystem.TouchPhase.Moved, center + new Vector2(20 * i, 0));
+                yield return Touch(2, UnityEngine.InputSystem.TouchPhase.Ended, center + new Vector2(100, 0));
+                Assert.AreNotEqual(yaw, editor.Yaw, "드래그하면 시점이 돈다");
+                Assert.AreEqual(1, state.UsedTotal, "드래그는 놓지 않는다");
+
+                // 핀치: 손가락 사이가 벌어지면 가까워진다(확대), 놓지 않는다
+                float distance = editor.Distance;
+                yield return Touch(3, UnityEngine.InputSystem.TouchPhase.Began, center);
+                yield return Touch(4, UnityEngine.InputSystem.TouchPhase.Began, center + new Vector2(50, 0));
+                yield return Touch(4, UnityEngine.InputSystem.TouchPhase.Moved, center + new Vector2(150, 0));
+                yield return Touch(4, UnityEngine.InputSystem.TouchPhase.Ended, center + new Vector2(150, 0));
+                yield return Touch(3, UnityEngine.InputSystem.TouchPhase.Ended, center);
+                Assert.Less(editor.Distance, distance, "벌리면 확대");
+                Assert.AreEqual(1, state.UsedTotal, "핀치는 놓지 않는다");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(touch);
+                restore();
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator 게임_화면의_단축키도_버튼_소리를_낸다()
+        {
+            var restore = AcceptUnfocusedInput();
             var keyboard = InputSystem.AddDevice<Keyboard>();
             try
             {
@@ -263,8 +322,7 @@ namespace PentaBrick.PlayTests
             finally
             {
                 InputSystem.RemoveDevice(keyboard);
-                InputSystem.settings = original;
-                Object.Destroy(settings);
+                restore();
             }
         }
 
