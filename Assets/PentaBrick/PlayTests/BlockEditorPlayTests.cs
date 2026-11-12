@@ -5,6 +5,8 @@ using PentaBrick.Core;
 using PentaBrick.Game;
 using PentaBrick.View;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UIElements;
@@ -220,6 +222,50 @@ namespace PentaBrick.PlayTests
             yield return null;
             yield return ClickName("undo"); // 지우기 소리가 나므로 버튼 소리는 생략
             Assert.AreEqual(before + 1, sfx.ClicksPlayed);
+        }
+
+        [UnityTest]
+        public IEnumerator 게임_화면의_단축키도_버튼_소리를_낸다()
+        {
+            // 배치 모드는 창에 포커스가 없어 기본 설정이면 입력이 버려진다. 복사본 설정으로 바꿨다가 되돌린다.
+            var original = InputSystem.settings;
+            var settings = Object.Instantiate(original);
+            settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+            InputSystem.settings = settings;
+            var keyboard = InputSystem.AddDevice<Keyboard>();
+            try
+            {
+                IEnumerator Press(params Key[] keys)
+                {
+                    InputSystem.QueueStateEvent(keyboard, new KeyboardState(keys));
+                    yield return null;
+                    InputSystem.QueueStateEvent(keyboard, new KeyboardState());
+                    yield return null;
+                }
+                var sfx = editor.GetComponent<Sfx>();
+
+                int before = sfx.ClicksPlayed;
+                yield return Press(Key.Q); // 메인 화면에서는 소리 없음
+                Assert.AreEqual(before, sfx.ClicksPlayed);
+
+                ui.Play(null);
+                yield return null;
+                yield return Press(Key.W);
+                Assert.AreEqual(before + 1, sfx.ClicksPlayed, "도구 단축키");
+                yield return Press(Key.LeftCtrl, Key.Z);
+                Assert.AreEqual(before + 1, sfx.ClicksPlayed, "되돌릴 것이 없으면 소리 없음");
+                yield return Press(Key.Digit6);
+                Assert.AreEqual(before + 1, sfx.ClicksPlayed, "p1에 없는 보라");
+                yield return Press(Key.Digit1);
+                Assert.AreEqual(before + 2, sfx.ClicksPlayed, "색 단축키");
+            }
+            finally
+            {
+                InputSystem.RemoveDevice(keyboard);
+                InputSystem.settings = original;
+                Object.Destroy(settings);
+            }
         }
 
         [UnityTest]

@@ -420,7 +420,11 @@ namespace PentaBrick.View
         private void Update()
         {
             CheckOrientation();
-            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) OnEscape();
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                if (CurrentScreen == UiScreen.Game) GetComponent<Sfx>()?.Click(); // 일시정지 버튼과 같은 소리
+                OnEscape();
+            }
             if (tutorial != null)
             {
                 if (!tutorial.Owns(state.Puzzle)) EndTutorial(); // 메뉴에서 다른 문제로 넘어갔다

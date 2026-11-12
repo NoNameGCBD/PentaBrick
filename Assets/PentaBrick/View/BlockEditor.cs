@@ -223,20 +223,28 @@ namespace PentaBrick.View
             var kb = Keyboard.current;
             if (kb == null || (ui != null && ui.IsTyping)) return; // 문제 코드를 입력하는 중에는 단축키를 끈다
 
+            // 단축키도 같은 버튼을 누른 것처럼 소리를 낸다. 그 버튼이 비활성일 때(없는 색, 되돌릴 것 없음)는 내지 않는다.
+            bool pressed = false;
             for (int i = 0; i < Colors.Count; i++)
-                if (kb[Key.Digit1 + i].wasPressedThisFrame) State.SetColor(i + 1);
+                if (kb[Key.Digit1 + i].wasPressedThisFrame)
+                {
+                    pressed |= State.Puzzle.Counts[i + 1] > 0;
+                    State.SetColor(i + 1);
+                }
 
-            if (kb.qKey.wasPressedThisFrame) State.SetTool(Tool.Place);
-            if (kb.wKey.wasPressedThisFrame) State.SetTool(Tool.Paint);
-            if (kb.eKey.wasPressedThisFrame) State.SetTool(Tool.Erase);
+            if (kb.qKey.wasPressedThisFrame) { pressed = true; State.SetTool(Tool.Place); }
+            if (kb.wKey.wasPressedThisFrame) { pressed = true; State.SetTool(Tool.Paint); }
+            if (kb.eKey.wasPressedThisFrame) { pressed = true; State.SetTool(Tool.Erase); }
 
             bool command = kb.ctrlKey.isPressed || kb.leftCommandKey.isPressed || kb.rightCommandKey.isPressed;
             if (command && kb.zKey.wasPressedThisFrame)
             {
-                if (kb.shiftKey.isPressed) State.Redo();
-                else State.Undo();
+                if (kb.shiftKey.isPressed) { pressed |= State.CanRedo; State.Redo(); }
+                else { pressed |= State.CanUndo; State.Undo(); }
             }
-            if (command && kb.yKey.wasPressedThisFrame) State.Redo();
+            if (command && kb.yKey.wasPressedThisFrame) { pressed |= State.CanRedo; State.Redo(); }
+
+            if (pressed && ui != null && ui.CurrentScreen == UiScreen.Game) GetComponent<Sfx>()?.Click();
         }
     }
 }
