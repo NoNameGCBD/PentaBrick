@@ -56,6 +56,7 @@ namespace PentaBrick.View
         private bool menuOpen;     // Esc 메뉴
         private bool settingsOpen; // Esc 메뉴 안의 설정
         private bool quitOpen;     // 메인 화면의 게임 종료 확인 창
+        private bool codeOpen;     // 모드 선택의 문제 코드 창
 
         // 전환 애니메이션. Build()가 매번 화면을 새로 만들므로 시작 시각만 기억하고 Update에서 시간으로 계산한다.
         private const float ScreenFade = 0.3f, ModalPop = 0.18f; // 초
@@ -162,6 +163,9 @@ namespace PentaBrick.View
         /// <summary>설정 창이 떠 있는지(메인이나 일시정지에서 연다).</summary>
         public bool IsSettingsOpen => settingsOpen;
 
+        /// <summary>모드 선택의 문제 코드 창이 떠 있는지.</summary>
+        public bool IsCodeOpen => codeOpen;
+
         /// <summary>펼친 평면도 카드의 방향. 없으면 null(기본 시점).</summary>
         public ViewDir? ExpandedView => expandedView;
 
@@ -184,6 +188,16 @@ namespace PentaBrick.View
             {
                 quitOpen = !quitOpen;
                 dirty = true;
+                return;
+            }
+            if (CurrentScreen == UiScreen.DifficultySelect)
+            {
+                if (codeOpen)
+                {
+                    codeOpen = false;
+                    dirty = true;
+                }
+                else Show(UiScreen.Main);
                 return;
             }
             if (CurrentScreen != UiScreen.Game) return;
@@ -332,7 +346,7 @@ namespace PentaBrick.View
             if (screen == UiScreen.Intro) introStart = Time.unscaledTime;
             if (screen != UiScreen.Game) EndTutorial();
             CurrentScreen = screen;
-            menuOpen = settingsOpen = quitOpen = false;
+            menuOpen = settingsOpen = quitOpen = codeOpen = false;
             expandedView = null;
             RefreshInput();
             codeMessage = "";
@@ -430,11 +444,12 @@ namespace PentaBrick.View
             modalOverlay = modalBox = null;
             if (menuOpen) BuildMenu();
             if (settingsOpen) BuildSettings();
+            if (codeOpen && CurrentScreen == UiScreen.DifficultySelect) BuildCodePopup();
             if (IsConfirming) BuildConfirm();
             if (askTutorial && CurrentScreen == UiScreen.Main) BuildTutorialPrompt();
             if (quitOpen && CurrentScreen == UiScreen.Main) BuildQuitConfirm();
             // 새 창이 열렸을 때만 다시 튀어나오게 한다(같은 창이 다시 그려질 때는 이어서).
-            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : settingsOpen ? "settings" : menuOpen ? "menu" : "result";
+            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : settingsOpen ? "settings" : codeOpen ? "code" : menuOpen ? "menu" : "result";
             if (modal != builtModal)
             {
                 if (builtModal != null && previousOverlay != null)
@@ -518,8 +533,9 @@ namespace PentaBrick.View
         private static Button BigButton(VisualElement parent, string title, string detail, Action onClick)
         {
             var button = new Button(onClick) { text = detail == "" ? title : $"{title}\n<size=12>{detail}</size>" };
-            button.style.width = 360;
-            button.style.height = detail == "" ? 56 : 64;
+            button.style.width = 240;
+            button.style.height = detail == "" ? 52 : 64;
+            button.style.borderTopLeftRadius = button.style.borderTopRightRadius = button.style.borderBottomLeftRadius = button.style.borderBottomRightRadius = 14;
             button.style.fontSize = 20;
             button.style.unityFontStyleAndWeight = FontStyle.Bold;
             button.style.marginBottom = 10;

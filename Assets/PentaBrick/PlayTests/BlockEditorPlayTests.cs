@@ -121,43 +121,66 @@ namespace PentaBrick.PlayTests
         private int CountButtons(string start) => Live<Button>().Where(b => b.text.StartsWith(start)).ToList().Count;
 
         [UnityTest]
-        public IEnumerator 메인에서_게임_시작을_누르면_난이도_선택을_거쳐_게임이_시작된다()
+        public IEnumerator 메인에서_플레이를_누르면_모드_선택을_거쳐_게임이_시작된다()
         {
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.IsFalse(editor.enabled, "메뉴에서는 3D 편집 입력이 꺼져 있다");
-            Assert.AreEqual(1, CountButtons("게임 시작"));
-            Assert.AreEqual(0, CountButtons("1 빨강"), "메인 화면에는 게임 패널이 없다");
+            Assert.IsNull(root.Q("tray"), "메인 화면에는 게임 트레이가 없다");
+            Assert.AreEqual(0, Live<Label>().Where(l => l.text.StartsWith("평면도와 블록 수를")).ToList().Count, "규칙 요약 없음");
+            Assert.AreEqual(ByName<VisualElement>("main-play").resolvedStyle.width, ByName<VisualElement>("main-tutorial").resolvedStyle.width, 0.5f, "플레이와 튜토리얼은 같은 크기");
             yield return Save("ui-main.png");
+
+            yield return ClickName("main-play");
+            Assert.AreEqual(UiScreen.DifficultySelect, ui.CurrentScreen);
+            foreach (string mode in new[] { "mode-sample", "mode-easy", "mode-normal", "mode-hard" }) Assert.IsNotNull(ByName<Button>(mode), mode);
+            Assert.IsNull(root.Q<TextField>(), "코드 입력 칸은 숨김");
+            yield return Save("ui-mode.png");
+            yield return ClickName("mode-code");
+            Assert.IsTrue(ui.IsCodeOpen);
+            ByName<TextField>("code-field").value = "  NORMAL-1P0WP ";
+            yield return ClickName("code-open");
+            Assert.AreEqual(UiScreen.Game, ui.CurrentScreen, "대문자·공백도 같은 코드");
+            Assert.AreEqual(Difficulty.Normal, editor.State.Mode);
+            Assert.IsFalse(ui.IsCodeOpen);
 
             ui.Show(UiScreen.DifficultySelect);
             yield return null;
-            Assert.AreEqual(1, CountButtons("샘플"));
-            Assert.AreEqual(1, CountButtons("쉬움"));
-            Assert.AreEqual(1, CountButtons("보통"));
-            Assert.AreEqual(1, CountButtons("어려움"));
-            Assert.IsNotNull(root.Q<TextField>(), "문제 코드 입력 칸");
-            Assert.IsFalse(ui.IsTyping);
-            yield return Save("ui-difficulty.png");
-
-            ui.Play(Difficulty.Hard);
+            yield return ClickName("mode-code");
+            ByName<TextField>("code-field").value = "@@";
+            yield return ClickName("code-open");
+            Assert.IsTrue(ui.IsCodeOpen, "잘못된 코드면 창이 남는다");
+            Assert.AreEqual(1, Live<Label>().Where(l => l.text.StartsWith("코드를 읽을 수 없습니다")).ToList().Count);
+            ui.OnEscape();
             yield return null;
+            Assert.IsFalse(ui.IsCodeOpen);
+            Assert.AreEqual(UiScreen.DifficultySelect, ui.CurrentScreen, "Esc는 코드 창만 닫음");
+            ui.OnEscape();
+            yield return null;
+            Assert.AreEqual(UiScreen.Main, ui.CurrentScreen, "모드 선택에서 Esc는 메인으로");
+
+            yield return ClickName("main-settings"); // 메인에서 여는 설정
+            Assert.IsTrue(ui.IsSettingsOpen);
+            Assert.IsNotNull(ByName<Toggle>("settings-showmine"));
+            ui.OnEscape();
+            yield return null;
+            Assert.IsFalse(ui.IsSettingsOpen);
+            Assert.IsFalse(ui.IsQuitOpen, "설정을 닫는 Esc는 종료 창을 열지 않는다");
+
+            yield return ClickName("main-play");
+            yield return ClickName("mode-hard");
             Assert.AreEqual(UiScreen.Game, ui.CurrentScreen);
             Assert.IsTrue(editor.enabled);
             Assert.AreEqual(Difficulty.Hard, editor.State.Mode);
-            Assert.IsNotNull(ByName<VisualElement>("view-top"), "평면도 카드");
-            Assert.IsNotNull(ByName<Button>("pause"));
-            Assert.AreEqual(0, CountButtons("메인 메뉴"), "메인 메뉴·난이도 변경은 Esc 메뉴 안으로 옮겼다");
-            Assert.AreEqual(0, CountButtons("난이도 변경"));
-            Assert.AreEqual(0, Live<Toggle>().ToList().Count, "평면도 표시 옵션은 설정으로 옮겼다");
             var rightView = ByName<VisualElement>("view-right");
             Assert.Greater(rightView.worldBound.height, 0);
             Assert.LessOrEqual(rightView.worldBound.xMax, root.worldBound.xMax + 0.5f, "평면도 카드가 화면 안에 있다");
+            Assert.AreEqual(0, Live<Toggle>().ToList().Count, "평면도 표시 옵션은 설정 안에만");
             yield return Save("ui-game-hard.png");
 
             ui.Show(UiScreen.Main);
             yield return null;
             Assert.IsFalse(editor.enabled);
-            Assert.AreEqual(1, CountButtons("게임 시작"));
+            Assert.IsNotNull(ByName<Button>("main-play"));
         }
 
         /// <summary>버튼을 실제로 누른 것처럼 클릭 이벤트를 보내고 화면이 다시 그려지기를 기다린다.</summary>
@@ -378,12 +401,12 @@ namespace PentaBrick.PlayTests
         [UnityTest]
         public IEnumerator 화면이_바뀌면_전환_애니메이션이_재생되고_그동안에도_클릭할_수_있다()
         {
-            yield return Click("게임 시작");
+            yield return ClickName("main-play");
             Assert.AreEqual(UiScreen.DifficultySelect, ui.CurrentScreen);
             Assert.IsTrue(ui.IsTransitioning);
 
             // 전환 중에 덮인 막이 클릭을 막지 않는다.
-            yield return Click("← 메인으로");
+            yield return ClickName("mode-back");
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
 
             yield return new WaitForSecondsRealtime(0.4f);
@@ -404,7 +427,7 @@ namespace PentaBrick.PlayTests
             Assert.IsFalse(ui.IsQuitOpen);
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.AreEqual(1, root.Query(className: GameUI.ClosingClass).ToList().Count, "닫힌 창이 서서히 사라지는 중");
-            var start = Live<Button>().Where(b => b.text == "게임 시작").First();
+            var start = ByName<Button>("main-play");
             var picked = root.panel.Pick(start.worldBound.center);
             Assert.IsTrue(picked == start || start.Contains(picked), "잔상이 남아 있어도 뒤의 버튼에 클릭이 닿는다");
             yield return new WaitForSecondsRealtime(0.3f);
@@ -432,7 +455,7 @@ namespace PentaBrick.PlayTests
             Assert.IsFalse(editor.enabled);
             var press = Live<Label>().Where(l => l.text == "PRESS ANY BUTTON").First();
             Assert.IsNotNull(press);
-            Assert.AreEqual(0, CountButtons("게임 시작"), "인트로에서는 메인 화면이 아직 없다");
+            Assert.IsNull(root.Q("main-play"), "인트로에서는 메인 화면이 아직 없다");
 
             yield return new WaitForSecondsRealtime(0.5f);
             yield return Save("ui-intro-1.png"); // 블록이 떨어지는 중
@@ -452,7 +475,7 @@ namespace PentaBrick.PlayTests
             ui.EnterMain(); // 실제로는 아무 키·마우스 클릭·터치가 이것을 부른다
             yield return null;
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
-            Assert.AreEqual(1, CountButtons("게임 시작"));
+            Assert.IsNotNull(ByName<Button>("main-play"));
             Assert.IsTrue(ui.IsAskingTutorial, "첫 접속이면 메인에서 튜토리얼 안내가 뜬다");
         }
 
@@ -501,7 +524,7 @@ namespace PentaBrick.PlayTests
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
             Assert.IsFalse(editor.State.ShowMineSetting, "튜토리얼 전 설정(꺼짐)으로 돌아간다");
 
-            yield return Click("튜토리얼"); // 메인 화면의 버튼
+            yield return ClickName("main-tutorial"); // 메인 화면의 버튼
             Assert.IsTrue(ui.InTutorial);
             yield return ClickName("pause");
             yield return ClickName("pause-next"); // 다른 문제로 넘어가면 튜토리얼은 끝난다

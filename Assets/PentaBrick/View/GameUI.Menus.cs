@@ -169,54 +169,84 @@ namespace PentaBrick.View
 #endif
         }
 
-        /// <summary>메인 화면: 제목, 규칙 요약, 게임 시작.</summary>
+        /// <summary>메인 화면: 제목, 플레이, 튜토리얼. 설정은 오른쪽 위.</summary>
         private void BuildMain()
         {
             var page = Page();
-            Text(page, "PentaBrick", 56, true).style.unityTextAlign = TextAnchor.MiddleCenter;
-            var subtitle = Text(page, "다섯 방향의 평면도를 보고 똑같은 블록 모형을 쌓는 공간 추론 퍼즐", 16, false, DimColor);
-            subtitle.style.unityTextAlign = TextAnchor.MiddleCenter;
-            subtitle.style.marginBottom = 36;
-
-            var start = BigButton(page, "게임 시작", "", () => Show(UiScreen.DifficultySelect));
-            start.style.backgroundColor = SelectColor;
-            BigButton(page, "튜토리얼", "", StartTutorial);
-
-            var rules = Text(page,
-                "평면도와 블록 수를 모두 맞춘 모형을 만들면 정답 제출 (정답 +1 / 오답 −1)\n" +
-                "만들 수 없는 문제라고 판단하면 불가능 선언 (맞으면 +2 / 틀리면 −2)",
-                13, false, DimColor);
-            rules.style.unityTextAlign = TextAnchor.MiddleCenter;
-            rules.style.marginTop = 36;
-            if (state.Score != 0) Text(page, $"현재 점수 {state.Score}", 14, true).style.marginTop = 12;
+            IconButton(Corner(page, true), "main-settings", Icon.Settings, "설정", OpenSettings);
+            Text(page, "PentaBrick", 56, true).style.marginBottom = 40;
+            var play = BigButton(page, "플레이", "", () => Show(UiScreen.DifficultySelect));
+            play.name = "main-play";
+            play.style.backgroundColor = GoodColor;
+            play.style.color = Color.black;
+            BigButton(page, "튜토리얼", "", StartTutorial).name = "main-tutorial";
+            if (state.Score != 0) Text(page, $"★ {state.Score}", 15, true, DimColor).style.marginTop = 24;
         }
 
-        /// <summary>난이도 선택 화면: 샘플(연습)과 세 난이도, 문제 코드로 열기.</summary>
+        /// <summary>모드 선택: 타일 네 개. 뒤로는 왼쪽 위, 문제 코드는 오른쪽 위 작은 창.</summary>
         private void BuildDifficultySelect()
         {
             var page = Page();
-            Text(page, "난이도 선택", 32, true).style.marginBottom = 24;
+            IconButton(Corner(page, false), "mode-back", Icon.Back, "메인으로 (Esc)", () => Show(UiScreen.Main));
+            IconButton(Corner(page, true), "mode-code", Icon.Code, "문제 코드로 열기", () => { codeOpen = true; codeMessage = ""; dirty = true; });
+            Text(page, "모드 선택", 28, true).style.marginBottom = 28;
 
-            BigButton(page, "샘플 (연습)", $"손으로 만든 문제 {SamplePuzzles.All.Count}개를 차례로 풉니다", () => Play(null));
+            var tiles = Row(page);
+            tiles.style.flexWrap = Wrap.Wrap;
+            tiles.style.justifyContent = Justify.Center;
+            ModeTile(tiles, "mode-sample", "연습", $"샘플 {SamplePuzzles.All.Count}", () => Play(null));
             foreach (Difficulty difficulty in Enum.GetValues(typeof(Difficulty)))
             {
                 var d = difficulty;
                 var s = DifficultySettings.Get(d);
-                BigButton(page, s.Label, $"{s.Size}×{s.Size}×{s.Height} · {s.Colors}색 · 블록 {s.MinBlocks}~{s.MaxBlocks}개", () => Play(d));
+                ModeTile(tiles, "mode-" + s.Key, s.Label, $"{s.Size}×{s.Size}", () => Play(d));
             }
+        }
 
-            var codeRow = Row(page);
-            codeRow.style.marginTop = 24;
-            codeRow.style.width = 360;
-            var codeField = new TextField { value = codeInput };
-            codeField.style.flexGrow = 1;
-            codeField.textEdition.placeholder = "문제 코드로 열기 (예: normal-1p0wp)";
-            codeField.RegisterValueChangedCallback(change => codeInput = change.newValue);
-            codeRow.Add(codeField);
-            Btn(codeRow, "열기", OpenCode);
-            if (codeMessage != "") Text(page, codeMessage, 12, false, BadColor);
+        private static void ModeTile(VisualElement parent, string name, string title, string detail, Action onClick)
+        {
+            var tile = new Button(onClick) { name = name, text = $"{title}\n<size=13><color=#9aa0ad>{detail}</color></size>" };
+            tile.style.width = 140;
+            tile.style.height = 160;
+            tile.style.marginLeft = tile.style.marginRight = tile.style.marginTop = tile.style.marginBottom = 8;
+            tile.style.fontSize = 22;
+            tile.style.unityFontStyleAndWeight = FontStyle.Bold;
+            tile.style.color = TextColor;
+            tile.style.backgroundColor = CardColor;
+            tile.style.borderTopLeftRadius = tile.style.borderTopRightRadius = tile.style.borderBottomLeftRadius = tile.style.borderBottomRightRadius = 18;
+            Border(tile, LineColor, 1);
+            parent.Add(tile);
+        }
 
-            Btn(page, "← 메인으로", () => Show(UiScreen.Main)).style.marginTop = 24;
+        /// <summary>문제 코드 창: 입력 칸, 열기, 오류 문장.</summary>
+        private void BuildCodePopup()
+        {
+            var box = Modal(360);
+            var head = Row(box);
+            head.style.alignItems = Align.Center;
+            head.style.marginBottom = 12;
+            Text(head, "문제 코드로 열기", 16, true).style.flexGrow = 1;
+            IconButton(head, "code-close", Icon.Erase, "닫기 (Esc)", () => { codeOpen = false; dirty = true; }, 36);
+            var row = Row(box);
+            var field = new TextField { name = "code-field", value = codeInput };
+            field.style.flexGrow = 1;
+            field.textEdition.placeholder = "예: normal-1p0wp";
+            field.RegisterValueChangedCallback(change => codeInput = change.newValue);
+            row.Add(field);
+            var open = Btn(row, "열기", OpenCode);
+            open.name = "code-open";
+            if (codeMessage != "") Text(box, codeMessage, 12, false, BadColor).style.marginTop = 8;
+        }
+
+        /// <summary>메뉴 화면의 왼쪽(false)·오른쪽(true) 위 모서리 자리.</summary>
+        private static VisualElement Corner(VisualElement page, bool right)
+        {
+            var corner = new VisualElement();
+            corner.style.position = Position.Absolute;
+            corner.style.top = 16;
+            if (right) corner.style.right = 16; else corner.style.left = 16;
+            page.Add(corner);
+            return corner;
         }
     }
 }
