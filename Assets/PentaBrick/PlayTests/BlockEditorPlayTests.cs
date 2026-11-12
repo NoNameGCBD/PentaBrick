@@ -85,8 +85,18 @@ namespace PentaBrick.PlayTests
             Assert.IsNotNull(panel);
         }
 
-        private int CountLabels(string text) => root.Query<Label>().Where(l => l.text == text).ToList().Count;
-        private int CountButtons(string start) => root.Query<Button>().Where(b => b.text.StartsWith(start)).ToList().Count;
+        /// <summary>닫히며 사라지는 중인 창(잔상)을 뺀 요소만 찾는다.</summary>
+        private UQueryBuilder<T> Live<T>() where T : VisualElement => root.Query<T>().Where(e => IsLive(e));
+
+        private static bool IsLive(VisualElement e)
+        {
+            for (; e != null; e = e.parent)
+                if (e.ClassListContains(GameUI.ClosingClass)) return false;
+            return true;
+        }
+
+        private int CountLabels(string text) => Live<Label>().Where(l => l.text == text).ToList().Count;
+        private int CountButtons(string start) => Live<Button>().Where(b => b.text.StartsWith(start)).ToList().Count;
 
         [UnityTest]
         public IEnumerator 메인에서_게임_시작을_누르면_난이도_선택을_거쳐_게임이_시작된다()
@@ -116,8 +126,8 @@ namespace PentaBrick.PlayTests
             Assert.AreEqual(1, CountButtons("메뉴 (Esc)"));
             Assert.AreEqual(0, CountButtons("메인 메뉴"), "메인 메뉴·난이도 변경은 Esc 메뉴 안으로 옮겼다");
             Assert.AreEqual(0, CountButtons("난이도 변경"));
-            Assert.AreEqual(0, root.Query<Toggle>().ToList().Count, "평면도 표시 옵션은 설정으로 옮겼다");
-            var basicView = root.Query<Button>().Where(b => b.text == "기본").First();
+            Assert.AreEqual(0, Live<Toggle>().ToList().Count, "평면도 표시 옵션은 설정으로 옮겼다");
+            var basicView = Live<Button>().Where(b => b.text == "기본").First();
             Assert.IsNotNull(basicView, "시점 버튼");
             Assert.Greater(basicView.worldBound.height, 0);
             Assert.LessOrEqual(basicView.worldBound.yMax, root.worldBound.yMax + 0.5f, "시점 버튼이 화면 안에 있다");
@@ -132,7 +142,7 @@ namespace PentaBrick.PlayTests
         /// <summary>버튼을 실제로 누른 것처럼 클릭 이벤트를 보내고 화면이 다시 그려지기를 기다린다.</summary>
         private IEnumerator Click(string text)
         {
-            var button = root.Query<Button>().Where(b => b.text == text).First();
+            var button = Live<Button>().Where(b => b.text == text).First();
             Assert.IsNotNull(button, $"\"{text}\" 버튼이 없음");
             using (var submit = NavigationSubmitEvent.GetPooled())
             {
@@ -234,6 +244,12 @@ namespace PentaBrick.PlayTests
             yield return Click("취소");
             Assert.IsFalse(ui.IsQuitOpen);
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
+            Assert.AreEqual(1, root.Query(className: GameUI.ClosingClass).ToList().Count, "닫힌 창이 서서히 사라지는 중");
+            var start = Live<Button>().Where(b => b.text == "게임 시작").First();
+            var picked = root.panel.Pick(start.worldBound.center);
+            Assert.IsTrue(picked == start || start.Contains(picked), "잔상이 남아 있어도 뒤의 버튼에 클릭이 닿는다");
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.AreEqual(0, root.Query(className: GameUI.ClosingClass).ToList().Count, "다 사라지면 치운다");
 
             ui.OnEscape();
             ui.OnEscape(); // 한 번 더 누르면 닫힌다
@@ -255,7 +271,7 @@ namespace PentaBrick.PlayTests
             yield return Create(keepIntro: true);
             Assert.AreEqual(UiScreen.Intro, ui.CurrentScreen);
             Assert.IsFalse(editor.enabled);
-            var press = root.Query<Label>().Where(l => l.text == "PRESS ANY BUTTON").First();
+            var press = Live<Label>().Where(l => l.text == "PRESS ANY BUTTON").First();
             Assert.IsNotNull(press);
             Assert.AreEqual(0, CountButtons("게임 시작"), "인트로에서는 메인 화면이 아직 없다");
 
@@ -353,9 +369,9 @@ namespace PentaBrick.PlayTests
             yield return Save("ui-menu.png");
 
             yield return Click("설정");
-            var volume = root.Query<Slider>().Where(x => x.label == "소리 크기").First(); // 스크롤바도 Slider라서 이름으로 찾는다
+            var volume = Live<Slider>().Where(x => x.label == "소리 크기").First(); // 스크롤바도 Slider라서 이름으로 찾는다
             Assert.IsNotNull(volume, "소리 크기");
-            var showMine = root.Query<Toggle>().Where(x => x.label.StartsWith("내 모형")).First();
+            var showMine = Live<Toggle>().Where(x => x.label.StartsWith("내 모형")).First();
             Assert.IsNotNull(showMine, "평면도 표시");
             volume.value = 0.25f;
             showMine.value = true;
@@ -386,13 +402,13 @@ namespace PentaBrick.PlayTests
             ui.OnEscape();
             yield return null;
             yield return Click("설정");
-            Assert.IsFalse(root.Query<Toggle>().Where(x => x.label.StartsWith("내 모형")).First().enabledSelf);
+            Assert.IsFalse(Live<Toggle>().Where(x => x.label.StartsWith("내 모형")).First().enabledSelf);
             Assert.IsFalse(editor.State.ShowMine);
             Assert.AreEqual(0, CountLabels("내 모형"), "평면도 카드에 내 모형 격자가 없다");
 
             ui.Show(UiScreen.Main);
             yield return null;
-            ui.OnEscape(); // 메인 화면에서는 아무 일도 없다
+            ui.OnEscape(); // 메인 화면에서는 메뉴 대신 종료 확인 창
             Assert.IsFalse(ui.IsMenuOpen);
 
             AudioListener.volume = 1f;
@@ -426,7 +442,7 @@ namespace PentaBrick.PlayTests
             Assert.AreEqual(new Vector3(1, 0.5f, -1), hit.transform.position);
 
             // UI: 문제에 없는 색(p1의 주황·보라)은 비활성, 정답 모형이라 다섯 평면도 모두 일치.
-            var swatches = root.Query<Button>().Where(b => b.text.Contains("/")).ToList();
+            var swatches = Live<Button>().Where(b => b.text.Contains("/")).ToList();
             Assert.AreEqual(6, swatches.Count, "팔레트 6칸");
             Assert.IsFalse(swatches[1].enabledSelf, "주황");
             Assert.IsFalse(swatches[5].enabledSelf, "보라");
@@ -437,7 +453,7 @@ namespace PentaBrick.PlayTests
             state.Submit();
             yield return null;
             yield return null;
-            Assert.AreEqual(1, root.Query<Label>().Where(l => l.text.StartsWith("정답입니다")).ToList().Count);
+            Assert.AreEqual(1, Live<Label>().Where(l => l.text.StartsWith("정답입니다")).ToList().Count);
             Assert.AreEqual(1, CountLabels("점수 미반영 (내 모형의 평면도 표시를 켠 문제)"));
             yield return Save("ui-result.png");
         }

@@ -62,6 +62,9 @@ namespace PentaBrick.View
         private string builtModal;
         private float modalStart = -10f;
         private VisualElement modalOverlay, modalBox;
+        private VisualElement closingOverlay; // 방금 닫힌 창의 잔상. 클릭은 통과시키고 서서히 사라진다
+        private float closeStart = -10f;
+        public const string ClosingClass = "closing";
         private const string VolumeKey = "volume";
         public const string TutorialSeenKey = "tutorialSeen"; // 튜토리얼을 하거나 건너뛰었으면 첫 접속 안내를 다시 띄우지 않는다
         private Tutorial tutorial;      // null이 아니면 튜토리얼 진행 중
@@ -389,6 +392,7 @@ namespace PentaBrick.View
 
         private void Build()
         {
+            var previousOverlay = modalOverlay;
             root.Clear();
             if (builtScreen != CurrentScreen)
             {
@@ -415,9 +419,18 @@ namespace PentaBrick.View
             string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : "menu";
             if (modal != builtModal)
             {
+                if (builtModal != null && previousOverlay != null)
+                {
+                    closingOverlay = previousOverlay;
+                    closeStart = Time.unscaledTime;
+                    closingOverlay.AddToClassList(ClosingClass);
+                    closingOverlay.Query<VisualElement>().ForEach(e => e.pickingMode = PickingMode.Ignore);
+                }
                 builtModal = modal;
                 modalStart = Time.unscaledTime;
             }
+            // 잔상은 새 창 아래, 화면 위에 둔다. 다시 그려도 사라질 때까지 계속 붙인다.
+            if (closingOverlay != null) root.Insert(root.IndexOf(screenCover) + 1, closingOverlay);
             Animate();
         }
 
@@ -428,6 +441,17 @@ namespace PentaBrick.View
             float s = Mathf.SmoothStep(0f, 1f, (now - screenStart) / ScreenFade);
             screenCover.style.opacity = 1f - s;
             screenCover.style.display = s >= 1f ? DisplayStyle.None : DisplayStyle.Flex;
+            if (closingOverlay != null)
+            {
+                float c = Mathf.SmoothStep(0f, 1f, (now - closeStart) / ModalPop);
+                closingOverlay.style.opacity = 1f - c;
+                closingOverlay[0].style.scale = new Scale(Vector2.one * (1f - 0.04f * c));
+                if (c >= 1f)
+                {
+                    closingOverlay.RemoveFromHierarchy();
+                    closingOverlay = null;
+                }
+            }
             if (modalOverlay == null) return;
             float m = Mathf.SmoothStep(0f, 1f, (now - modalStart) / ModalPop);
             modalOverlay.style.opacity = m;
