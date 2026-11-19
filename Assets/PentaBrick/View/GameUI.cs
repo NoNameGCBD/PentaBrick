@@ -118,6 +118,7 @@ namespace PentaBrick.View
             // 모든 빌드에 같은 한글 글꼴(Noto Sans KR, OFL: Resources/Fonts/NotoSansKR-OFL.txt). 굵은 글씨는 Unity가 굵게 그린다.
             root.style.unityFontDefinition = FontDefinition.FromFont(Resources.Load<Font>("Fonts/Pretendard-Regular") ?? Resources.Load<Font>("Fonts/NotoSansKR-Regular"));
             AudioListener.volume = PlayerPrefs.GetFloat(VolumeKey, 1f);
+            WindowMode.ApplySaved(); // PC: 전체화면이 기본, 설정에서 창모드로 바꿀 수 있다
 
             // 공유 주소(?mode=&seed=)로 들어왔으면 메뉴를 건너뛰고 그 문제로 바로 들어간다.
             if (Generator.TryParseUrl(Application.absoluteURL, out _, out _)) Show(UiScreen.Game);

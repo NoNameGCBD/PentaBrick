@@ -73,7 +73,7 @@ namespace PentaBrick.View
             dirty = true;
         }
 
-        /// <summary>설정 창: 소리 크기, 내 모형 평면도 표시(연습 전용), 점수 초기화. 일시정지에서 열면 닫을 때 일시정지로 돌아간다.</summary>
+        /// <summary>설정 창: 소리 크기, 전체화면(PC·브라우저), 내 모형 평면도 표시(연습 전용), 점수 초기화. 일시정지에서 열면 닫을 때 일시정지로 돌아간다.</summary>
         private void BuildSettings()
         {
             var box = Modal(340);
@@ -91,6 +91,13 @@ namespace PentaBrick.View
                 PlayerPrefs.SetFloat(VolumeKey, change.newValue);
             });
             box.Add(volume);
+            if (WindowMode.Supported)
+            {
+                var fullscreen = new Toggle("전체화면 (끄면 창모드)") { name = "settings-fullscreen", value = WindowMode.IsFullscreen };
+                fullscreen.RegisterValueChangedCallback(change => WindowMode.Set(change.newValue));
+                fullscreen.style.marginTop = 8;
+                box.Add(fullscreen);
+            }
             var showMine = new Toggle("내 모형의 평면도 표시 (연습 모드 전용)") { name = "settings-showmine", value = state.ShowMineSetting };
             showMine.RegisterValueChangedCallback(change => state.SetShowMine(change.newValue));
             showMine.SetEnabled(CurrentScreen != UiScreen.Game || state.Mode == null); // 게임 밖에서는 언제든, 게임 중에는 연습 모드에서만
