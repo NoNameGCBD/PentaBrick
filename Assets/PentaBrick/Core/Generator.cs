@@ -172,7 +172,7 @@ namespace PentaBrick.Core
         }
 
         /// <summary>
-        /// 가능한 문제의 평면도 한 칸이나 블록 수를 고친 문제를 만든다(해가 없는지는 아직 모른다).
+        /// 가능한 문제의 평면도 한 칸이나 블록 총수를 고친 문제를 만든다(해가 없는지는 아직 모른다).
         /// 고칠 곳을 못 찾으면 null.
         /// </summary>
         private static Puzzle Tamper(Puzzle puzzle, Mulberry32 rng)
@@ -183,18 +183,17 @@ namespace PentaBrick.Core
 
             var views = new int[puzzle.Views.Length][,];
             for (int i = 0; i < views.Length; i++) views[i] = (int[,])puzzle.Views[i].Clone();
-            var counts = (int[])puzzle.Counts.Clone();
+            int total = puzzle.Total;
             string reason;
 
             if (Pick(3) == 0)
             {
-                // 블록 수 모순: 한 색을 줄이고 다른 색을 늘린다.
-                int fewer = palette[Pick(palette.Count)], more = palette[Pick(palette.Count)];
-                if (fewer == more) return null;
-                counts[fewer]--;
-                counts[more]++;
-                reason = $"원래 풀 수 있는 문제에서 {Colors.Names[fewer]} 블록을 1개 줄이고 {Colors.Names[more]} 블록을 1개 늘린 문제입니다. "
-                    + "다섯 평면도를 모두 만족하면서 이 개수를 정확히 쓰는 모형은 없습니다.";
+                // 블록 수 모순: 총수를 1~2개 줄이거나 늘린다(그 개수로는 다섯 평면도를 만들 수 없을 때만 쓰인다).
+                int change = (1 + Pick(2)) * (Pick(2) == 0 ? -1 : 1);
+                if (total + change < 1) return null;
+                total += change;
+                reason = $"원래 풀 수 있는 문제에서 블록 총수를 {Math.Abs(change)}개 {(change < 0 ? "줄인" : "늘린")} 문제입니다. "
+                    + $"다섯 평면도를 모두 만족하면서 블록 {total}개를 정확히 쓰는 모형은 없습니다.";
             }
             else
             {
@@ -209,11 +208,11 @@ namespace PentaBrick.Core
                 view[row, col] = after;
                 reason = $"원래 풀 수 있는 문제의 {ViewNames[v]} 평면도에서 위에서 {row + 1}번째 줄, 왼쪽에서 {col + 1}번째 칸을 "
                     + $"{Colors.Names[before]}에서 {Colors.Names[after]}{(after == Colors.Purple ? "로" : "으로")} 바꾼 문제입니다. "
-                    + "이 칸은 다른 평면도나 블록 수와 동시에 만족할 수 없습니다.";
+                    + "이 칸은 다른 평면도나 블록 총수와 동시에 만족할 수 없습니다.";
             }
 
-            return new Puzzle(puzzle.Id, puzzle.Size, puzzle.Height, views, counts,
-                solvable: false, answer: null, reason: reason, difficulty: puzzle.Difficulty, seed: puzzle.Seed);
+            return new Puzzle(puzzle.Id, puzzle.Size, puzzle.Height, views, puzzle.Counts,
+                solvable: false, answer: null, reason: reason, difficulty: puzzle.Difficulty, seed: puzzle.Seed, total: total);
         }
 
         /// <summary>항상 가능한 문제를 만든다(웹 프로토타입의 generatePuzzle과 같은 결과).</summary>

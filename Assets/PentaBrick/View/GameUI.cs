@@ -24,21 +24,20 @@ namespace PentaBrick.View
             new Color32(0xe5, 0x48, 0x4d, 255), new Color32(0xf0, 0x8c, 0x2e, 255), new Color32(0xf2, 0xc9, 0x4c, 255),
             new Color32(0x3f, 0xb5, 0x6b, 255), new Color32(0x3b, 0x82, 0xf6, 255), new Color32(0x9b, 0x5d, 0xe5, 255),
         };
-        private static readonly string[] ViewNames = { "위", "앞", "뒤", "왼쪽", "오른쪽" };
         private static readonly string[] ViewHints =
         {
             "위에서 · 아래쪽이 앞", "앞에서", "뒤에서 · 좌우 반전", "왼쪽에서 · 오른쪽이 앞", "오른쪽에서 · 왼쪽이 앞",
         };
 
-        private static readonly Color PanelColor = new Color32(0x24, 0x28, 0x31, 245);
-        private static readonly Color PageColor = new Color32(0x1a, 0x1d, 0x24, 255);
-        private static readonly Color CardColor = new Color32(0x2e, 0x33, 0x3e, 255);
-        private static readonly Color LineColor = new Color32(0x4a, 0x50, 0x5e, 255);
+        private static readonly Color PanelColor = new Color32(0x14, 0x23, 0x39, 250);
+        private static readonly Color PageColor = new Color32(0x0d, 0x16, 0x27, 255);
+        private static readonly Color CardColor = new Color32(0x1b, 0x2c, 0x43, 255);
+        private static readonly Color LineColor = new Color32(0x35, 0x4c, 0x66, 255);
         private static readonly Color TextColor = new Color32(0xe8, 0xea, 0xee, 255);
         private static readonly Color DimColor = new Color32(0x9a, 0xa0, 0xad, 255);
         private static readonly Color GoodColor = new Color32(0x3f, 0xb5, 0x6b, 255);
         private static readonly Color BadColor = new Color32(0xe5, 0x48, 0x4d, 255);
-        private static readonly Color SelectColor = new Color32(0x3b, 0x82, 0xf6, 255);
+        private static readonly Color SelectColor = new Color32(0x61, 0xd8, 0xe8, 255);
 
         private BlockEditor editor;
         private GameState state;
@@ -94,7 +93,7 @@ namespace PentaBrick.View
         {
             editor = GetComponent<BlockEditor>();
             state = editor.State;
-            state.Changed += () => dirty = true; // 버튼 콜백 도중에 화면을 갈아엎지 않도록 다음 Update에서 다시 만든다
+            state.Changed += OnStateChanged; // 버튼 콜백 도중에 화면을 갈아엎지 않도록 다음 Update에서 다시 만든다
 
             var settings = ScriptableObject.CreateInstance<PanelSettings>();
             settings.themeStyleSheet = Resources.Load<ThemeStyleSheet>("PentaBrickTheme");
@@ -117,7 +116,7 @@ namespace PentaBrick.View
             root.RegisterCallback<NavigationSubmitEvent>(e => OnButtonPressed(e.target), TrickleDown.TrickleDown);
             root.style.fontSize = 13;
             // 모든 빌드에 같은 한글 글꼴(Noto Sans KR, OFL: Resources/Fonts/NotoSansKR-OFL.txt). 굵은 글씨는 Unity가 굵게 그린다.
-            root.style.unityFontDefinition = FontDefinition.FromFont(Resources.Load<Font>("Fonts/NotoSansKR-Regular"));
+            root.style.unityFontDefinition = FontDefinition.FromFont(Resources.Load<Font>("Fonts/Pretendard-Regular") ?? Resources.Load<Font>("Fonts/NotoSansKR-Regular"));
             AudioListener.volume = PlayerPrefs.GetFloat(VolumeKey, 1f);
 
             // 공유 주소(?mode=&seed=)로 들어왔으면 메뉴를 건너뛰고 그 문제로 바로 들어간다.
@@ -127,6 +126,16 @@ namespace PentaBrick.View
                 Show(UiScreen.Intro); // 인트로 → (아무 버튼) → 메인. 첫 접속 안내는 메인에서 뜬다
                 askTutorial = PlayerPrefs.GetInt(TutorialSeenKey, 0) == 0;
             }
+        }
+
+        private void OnStateChanged() => dirty = true;
+
+        private void OnDestroy()
+        {
+            if (state != null) state.Changed -= OnStateChanged;
+            tooltipTimer?.Pause();
+            if (panelSettings != null) Destroy(panelSettings);
+            ReleaseArcadeTextures();
         }
 
         private void OnButtonPressed(IEventHandler target)
@@ -198,7 +207,7 @@ namespace PentaBrick.View
         public bool IsTransitioning => Time.unscaledTime - screenStart < ScreenFade;
 
         /// <summary>게임 화면에서 창이 하나도 안 떠 있을 때만 3D 편집과 단축키를 받는다.</summary>
-        private void RefreshInput() => editor.enabled = CurrentScreen == UiScreen.Game && !menuOpen && !settingsOpen && !IsConfirming;
+        private void RefreshInput() => editor.enabled = CurrentScreen == UiScreen.Game && !menuOpen && !settingsOpen && !IsConfirming && utilityPopup == null;
 
         /// <summary>Esc: 메인 화면에서는 종료 확인 창을 열고 닫는다. 게임 화면에서는 떠 있는 창을 하나 닫고(확인 창 → 설정 → 메뉴), 아무것도 없으면 메뉴를 연다.</summary>
         public void OnEscape()
@@ -226,6 +235,7 @@ namespace PentaBrick.View
                 return;
             }
             if (CurrentScreen != UiScreen.Game) return;
+            if (utilityPopup != null) { CloseUtility(); return; }
             if (IsConfirming) CloseConfirm(false);
             else if (settingsOpen) settingsOpen = false;
             else
@@ -384,8 +394,12 @@ namespace PentaBrick.View
             if (screen == UiScreen.Intro) { introStart = Time.unscaledTime; introPrev = -1; }
             if (screen != UiScreen.Game) EndTutorial();
             CurrentScreen = screen;
+            // 주소의 ?mode=&seed=는 게임 화면에서만 둔다. 메인 등으로 나간 뒤 새로고침하면 그 문제로 되돌아가지 않는다.
+            Web.SetQuery(screen == UiScreen.Game ? Web.Query(state) : "");
             menuOpen = settingsOpen = quitOpen = codeOpen = false;
             expandedView = null;
+            utilityPopup = null;
+            editor.SetVisibleLayer(-1);
             RefreshInput();
             codeMessage = "";
             dirty = true;
@@ -446,6 +460,7 @@ namespace PentaBrick.View
             else if (screenCover != null) Animate();
             if (CurrentScreen == UiScreen.Intro) UpdateIntro();
             if (CurrentScreen != UiScreen.Game) return;
+            UpdateNotice();
             int seconds = (int)(state.ElapsedMs / 1000);
             timeLabel.text = $"{seconds / 60:00}:{seconds % 60:00}";
             if (state.Mode != null)
@@ -454,10 +469,9 @@ namespace PentaBrick.View
                 timeLabel.text += $"<color=#9aa0ad> / {bonus / 60:00}:{bonus % 60:00}</color>";
             }
 
-            // 3D 카메라가 가운데 영역에만 그리게 한다(모형이 패널에 가려지지 않게).
-            Rect full = root.worldBound, area = center.worldBound;
-            if (full.width > 0 && area.width > 0 && Camera.main != null)
-                Camera.main.rect = new Rect(area.x / full.width, 1 - area.yMax / full.height, area.width / full.width, area.height / full.height);
+            // 카메라는 전체 화면을 그리고, HUD의 빈 공간은 입력을 통과시킨다.
+            if (Camera.main != null) Camera.main.rect = new Rect(0, 0, 1, 1);
+            UpdateGridDirections();
         }
 
         /// <summary>
@@ -487,6 +501,7 @@ namespace PentaBrick.View
             modalOverlay = modalBox = null; // 결과 팝업은 화면(게임) 안에서 만들어지므로 화면보다 먼저 비운다
             resultPopupShown = false;
             root.Clear();
+            confetti.Clear();
             if (builtScreen != CurrentScreen)
             {
                 if (builtScreen != null) screenStart = Time.unscaledTime; // 처음 뜨는 화면은 바로 보인다
@@ -503,6 +518,7 @@ namespace PentaBrick.View
             screenCover.style.backgroundColor = PageColor;
             root.Add(screenCover);
 
+            if (utilityPopup != null && CurrentScreen == UiScreen.Game) BuildUtilityPopup();
             if (menuOpen) BuildMenu();
             if (settingsOpen) BuildSettings();
             if (codeOpen && CurrentScreen == UiScreen.DifficultySelect) BuildCodePopup();
@@ -510,7 +526,7 @@ namespace PentaBrick.View
             if (askTutorial && CurrentScreen == UiScreen.Main) BuildTutorialPrompt();
             if (quitOpen && CurrentScreen == UiScreen.Main) BuildQuitConfirm();
             // 새 창이 열렸을 때만 다시 튀어나오게 한다(같은 창이 다시 그려질 때는 이어서).
-            string modal = modalOverlay == null ? null : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : settingsOpen ? "settings" : codeOpen ? "code" : menuOpen ? "menu" : "result";
+            string modal = modalOverlay == null ? null : utilityPopup != null ? utilityPopup : quitOpen ? "quit" : askTutorial ? "tutorial" : IsConfirming ? "confirm" : settingsOpen ? "settings" : codeOpen ? "code" : menuOpen ? "menu" : "result";
             if (modal != builtModal)
             {
                 bool resultStays = builtModal == "result" && resultPopupShown; // 결과 위에 다른 창이 뜬 것: 결과는 사라지지 않는다
@@ -625,7 +641,13 @@ namespace PentaBrick.View
             if (modalOverlay == null) return;
             float m = Mathf.SmoothStep(0f, 1f, (now - modalStart) / ModalPop);
             modalOverlay.style.opacity = m;
-            modalBox.style.scale = new Scale(Vector2.one * (0.94f + 0.06f * m));
+            bool result = modalBox.name == "result";
+            float age = now - modalStart;
+            float pop = result ? 1f + 0.08f * Mathf.Sin(Mathf.Clamp01(age / 0.42f) * Mathf.PI) * Mathf.Exp(-age * 2) : 1f;
+            modalBox.style.scale = new Scale(Vector2.one * (0.94f + 0.06f * m) * pop);
+            if (result && !state.Result.Correct)
+                modalBox.style.translate = new Translate(age < 0.55f ? Mathf.Sin(age * 68) * 12 * (1 - age / 0.55f) : 0, 0);
+            AnimateConfetti(age);
         }
 
         /// <summary>화면 전체를 어둡게 덮고 가운데에 창을 띄운다. 창의 내용을 담을 상자를 돌려준다.</summary>
@@ -644,7 +666,7 @@ namespace PentaBrick.View
             box.style.backgroundColor = PanelColor;
             box.style.paddingLeft = box.style.paddingRight = box.style.paddingTop = box.style.paddingBottom = 20;
             box.style.borderTopLeftRadius = box.style.borderTopRightRadius = box.style.borderBottomLeftRadius = box.style.borderBottomRightRadius = 16;
-            Border(box, LineColor, 1);
+            Glass(box);
             overlay.Add(box);
             modalOverlay = overlay;
             modalBox = box;
@@ -660,10 +682,12 @@ namespace PentaBrick.View
         {
             var page = new VisualElement();
             page.style.flexGrow = 1;
+            page.AddToClassList("puzzle-page");
             page.style.backgroundColor = PageColor;
             page.style.alignItems = Align.Center;
             page.style.justifyContent = Justify.Center;
             root.Add(page);
+            AddPagePattern(page);
             return page;
         }
 
@@ -719,6 +743,7 @@ namespace PentaBrick.View
         {
             var button = new Button(onClick) { name = name, tooltip = tooltip, text = "" };
             button.AddToClassList("icon-button");
+            button.AddToClassList("tactile");
             button.style.flexShrink = 0; // 줄이 좁아도 44px 터치 크기를 지킨다
             button.style.width = button.style.height = size;
             button.style.paddingLeft = button.style.paddingRight = button.style.paddingTop = button.style.paddingBottom = 0;
@@ -728,7 +753,8 @@ namespace PentaBrick.View
             button.style.backgroundColor = CardColor;
             button.style.borderTopLeftRadius = button.style.borderTopRightRadius = button.style.borderBottomLeftRadius = button.style.borderBottomRightRadius = size * 0.25f;
             Border(button, LineColor, 1);
-            button.Add(Icons.Make(icon, size * 0.6f, TextColor));
+            button.Add(Icons.Make(icon, size * 0.5f, TextColor));
+            Bevel(button, CardColor);
             parent.Add(button);
             return button;
         }

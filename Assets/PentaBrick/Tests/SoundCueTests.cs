@@ -25,12 +25,10 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void 놓기_지우기_칠하기()
+        public void 놓기_지우기()
         {
             game.SetColor(G);
             Assert.AreEqual(Sound.Place, After(() => game.Place(0, 0)));
-            game.SetColor(R);
-            Assert.AreEqual(Sound.Paint, After(() => game.Paint(0, 0, 0)));
             Assert.AreEqual(Sound.Erase, After(() => game.Erase(0, 0, 0)));
         }
 
@@ -46,9 +44,8 @@ namespace PentaBrick.Tests
         [Test]
         public void 거부된_동작과_선택은_소리가_없다()
         {
-            game.SetColor(B); // p1의 파랑은 1개
-            game.Place(0, 0);
-            Assert.AreEqual(Sound.None, After(() => game.Place(1, 1)));
+            for (int i = 0; i < 7; i++) game.Place(i % 3, i / 3); // p1은 총 7개
+            Assert.AreEqual(Sound.None, After(() => game.Place(2, 2)));
             Assert.AreEqual(Sound.None, After(() => game.SetColor(R)));
             Assert.AreEqual(Sound.None, After(() => game.SetTool(Tool.Erase)));
         }
@@ -66,8 +63,14 @@ namespace PentaBrick.Tests
         public void 제출하면_정답_오답_정답보기는_소리가_없다()
         {
             Assert.AreEqual(Sound.Wrong, After(game.DeclareImpossible)); // p1은 풀 수 있는 문제
-            Assert.AreEqual(Sound.None, After(game.ShowAnswer));
+            Assert.AreEqual(Sound.None, After(game.Reveal));
+            Assert.AreEqual(Sound.None, After(game.ShowMyModel));
             Assert.AreEqual(Sound.None, After(game.NewPuzzle));
+
+            game.Place(0, 0);
+            Assert.AreEqual(Sound.Wrong, After(game.Submit));
+            Assert.AreEqual(Sound.None, After(game.Retry), "다시 도전");
+            game.Undo();
 
             var answer = game.Puzzle.Answer;
             for (int z = 0; z < answer.Size; z++)

@@ -144,6 +144,166 @@ namespace PentaBrick.PlayTests
         private int CountButtons(string start) => Live<Button>().Where(b => b.text.StartsWith(start)).ToList().Count;
 
         [UnityTest]
+        public IEnumerator 격자_방향_표시는_카메라를_따르고_입력을_가로채지_않는다()
+        {
+            ui.Play(null);
+            yield return null;
+            yield return ClickName("view-top");
+            for (int i = 0; i < 3; i++) yield return null;
+            Assert.Greater(ByName<Label>("grid-front").worldBound.center.y, ByName<Label>("grid-back").worldBound.center.y);
+            Assert.Less(ByName<Label>("grid-left").worldBound.center.x, ByName<Label>("grid-right").worldBound.center.x);
+            foreach (string name in new[] { "grid-front", "grid-back", "grid-left", "grid-right" })
+            {
+                var label = ByName<Label>(name);
+                Assert.AreEqual(PickingMode.Ignore, label.pickingMode);
+                Assert.AreEqual(DisplayStyle.Flex, label.resolvedStyle.display);
+                Assert.AreNotEqual(label, root.panel.Pick(label.worldBound.center));
+            }
+            yield return ClickName("view-back");
+            for (int i = 0; i < 3; i++) yield return null;
+            Assert.Greater(ByName<Label>("grid-left").worldBound.center.x, ByName<Label>("grid-right").worldBound.center.x, "뒤에서 보면 좌우 방향이 화면에서 반전된다");
+            yield return ClickName("camera");
+            yield return Save("ui-grid-directions.png");
+        }
+
+        [UnityTest]
+        public IEnumerator 세로_정면_시점에서도_작업대가_잘리지_않는다()
+        {
+            ui.Play(Difficulty.Hard);
+            yield return Resize(400, 800);
+            yield return ClickName("view-front");
+            yield return null;
+            var cam = Camera.main;
+            for (int x = -1; x <= 1; x += 2)
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    var point = cam.WorldToViewportPoint(new Vector3(x * 2.5f, 0, z * 2.5f));
+                    Assert.That(point.x, Is.InRange(0f, 1f), "작업대 좌우 끝이 화면 안에 있어야 함");
+                }
+            Assert.AreEqual(new Rect(0, 0, 1, 1), cam.rect);
+        }
+
+        [UnityTest]
+        public IEnumerator 층별_보기는_모형과_평면도를_바꾸지_않는다()
+        {
+            ui.Play(null);
+            editor.State.SetColor(4);
+            for (int i = 0; i < 3; i++) editor.State.Place(0, 0);
+            editor.State.SetColor(1);
+            editor.State.Place(1, 0);
+            yield return null;
+            var model = editor.State.Model;
+            var views = Projection.ProjectAll(model);
+            for (int layer = 0; layer < 3; layer++)
+            {
+                yield return ClickName("layer-" + (layer + 1));
+                Assert.AreEqual(layer, editor.VisibleLayer);
+                Assert.AreSame(model, editor.State.Model, "층 보기는 실제 모형을 바꾸지 않는다");
+                Assert.AreEqual(4, editor.State.UsedTotal);
+                int visibleBlocks = 0, floors = 0;
+                foreach (Transform cube in editor.transform.Find("Blocks"))
+                {
+                    bool shown = cube.GetComponent<Renderer>().enabled;
+                    Assert.AreEqual(shown, cube.GetComponent<Collider>().enabled, "숨긴 블록이 클릭을 가로채지 않는다");
+                    if (cube.position.y < 0) { Assert.IsTrue(shown, "바닥 격자는 유지"); floors++; }
+                    else if (shown)
+                    {
+                        visibleBlocks++;
+                        Assert.AreEqual(layer + 0.5f, cube.position.y, 0.001f, "선택한 층만 표시");
+                    }
+                }
+                Assert.AreEqual(9, floors);
+                Assert.AreEqual(layer == 0 ? 2 : 1, visibleBlocks, "위층뿐 아니라 아래층도 숨겨야 한다");
+                for (int i = 0; i < 5; i++) Assert.IsTrue(Projection.ViewsEqual(views[i], Projection.Project(editor.State.Model, (ViewDir)i)));
+            }
+            // 선택한 층에서 편집/되돌리기로 큐브가 재생성되어도 층 선택은 유지된다.
+            editor.State.Erase(0, 2, 0);
+            yield return null;
+            foreach (Transform cube in editor.transform.Find("Blocks"))
+                if (cube.position.y >= 0 && cube.GetComponent<Renderer>().enabled)
+                    Assert.AreEqual(2.5f, cube.position.y, 0.001f);
+            editor.State.Undo();
+            yield return null;
+            Assert.AreSame(model, editor.State.Model);
+            yield return ClickName("layer-all");
+            Assert.AreEqual(-1, editor.VisibleLayer);
+            foreach (Transform cube in editor.transform.Find("Blocks"))
+            {
+                Assert.IsTrue(cube.GetComponent<Renderer>().enabled);
+                Assert.IsTrue(cube.GetComponent<Collider>().enabled);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator HUD_빈_공간은_입력을_통과시키고_유틸리티는_모달로_열린다()
+        {
+            ui.Play(Difficulty.Hard);
+            yield return null;
+            Assert.AreEqual(new Rect(0, 0, 1, 1), Camera.main.rect);
+            Assert.IsNull(root.panel.Pick(new Vector2(root.worldBound.width * 0.7f, root.worldBound.height * 0.45f)), "빈 공간은 3D 카메라 입력으로 통과");
+            yield return ClickName("hud-help");
+            Assert.IsNotNull(ByName<VisualElement>("utility-help"));
+            Assert.IsFalse(editor.enabled);
+            ui.OnEscape();
+            yield return null;
+            Assert.IsTrue(editor.enabled);
+            yield return ClickName("hud-new");
+            var puzzle = editor.State.Puzzle;
+            yield return ClickName("utility-close");
+            Assert.AreSame(puzzle, editor.State.Puzzle, "닫으면 문제 유지");
+            yield return ClickName("hud-new");
+            yield return ClickName("utility-new-confirm");
+            Assert.AreNotSame(puzzle, editor.State.Puzzle);
+            Assert.AreEqual(-1, editor.VisibleLayer);
+            yield return ClickName("hud-share");
+            Assert.IsNotNull(ByName<VisualElement>("utility-share"));
+        }
+
+        [UnityTest]
+        public IEnumerator 높이_상한선을_그리고_넘치면_경고한다()
+        {
+            ui.Play(null); // p1: 3×3, 높이 3
+            yield return null;
+            var limit = editor.transform.Find("Height limit");
+            Assert.IsNotNull(limit, "격자 위 상한선");
+            Assert.Greater(limit.childCount, 8 * 3, "윗변 4개 + 모서리 기둥 4개가 각각 여러 조각의 점선");
+            float top = 0;
+            foreach (Transform dash in limit)
+            {
+                Assert.IsNull(dash.GetComponent<Collider>(), "상한선은 클릭을 가로채지 않는다");
+                Assert.LessOrEqual(Mathf.Max(dash.localScale.x, dash.localScale.y, dash.localScale.z), 0.2f, "점선 조각");
+                var material = dash.GetComponent<Renderer>().sharedMaterial;
+                Assert.AreEqual("PentaBrick/GuideLine", material.shader.name, "반투명 안내선 셰이더");
+                Assert.Less(material.GetColor("_BaseColor").a, 0.5f, "흐릿하게");
+                top = Mathf.Max(top, dash.position.y + dash.localScale.y / 2);
+            }
+            Assert.AreEqual(editor.State.Puzzle.Height, top, 0.05f, "최대 높이에 그린다");
+            ui.Notice("높이 제한: 3층까지만 쌓을 수 있어요");
+            yield return null;
+            yield return null;
+            Assert.AreEqual("높이 제한: 3층까지만 쌓을 수 있어요", ByName<Label>("notice").text);
+            Assert.AreNotEqual(ByName<Label>("notice"), root.panel.Pick(ByName<Label>("notice").worldBound.center), "경고 문구는 클릭을 통과");
+            yield return Save("ui-height-limit.png");
+        }
+
+        [UnityTest]
+        public IEnumerator 색과_도구를_바꿔도_블록을_재생성하지_않는다()
+        {
+            ui.Play(null);
+            editor.State.Place(0, 0);
+            yield return null;
+            var before = editor.transform.Find("Blocks");
+            editor.State.SetColor(4);
+            editor.State.SetTool(PentaBrick.Game.Tool.Erase);
+            editor.State.SetShowMine(true);
+            yield return null;
+            Assert.AreSame(before, editor.transform.Find("Blocks"));
+            editor.State.Place(1, 0);
+            yield return null;
+            Assert.AreNotSame(before, editor.transform.Find("Blocks"));
+        }
+
+        [UnityTest]
         public IEnumerator 메인에서_플레이를_누르면_모드_선택을_거쳐_게임이_시작된다()
         {
             Assert.AreEqual(UiScreen.Main, ui.CurrentScreen);
@@ -310,12 +470,15 @@ namespace PentaBrick.PlayTests
 
                 ui.Play(null);
                 yield return null;
-                yield return Press(Key.W);
+                yield return Press(Key.E);
                 Assert.AreEqual(before + 1, sfx.ClicksPlayed, "도구 단축키");
                 yield return Press(Key.LeftCtrl, Key.Z);
                 Assert.AreEqual(before + 1, sfx.ClicksPlayed, "되돌릴 것이 없으면 소리 없음");
                 yield return Press(Key.Digit6);
-                Assert.AreEqual(before + 1, sfx.ClicksPlayed, "p1에 없는 보라");
+                Assert.AreEqual(before + 1, sfx.ClicksPlayed, "p1은 색이 4개뿐이라 6번 없음");
+                yield return Press(Key.Digit2);
+                Assert.AreEqual(3, editor.State.Color, "2번 키 = p1의 두 번째 색(노랑)");
+                before++;
                 yield return Press(Key.Digit1);
                 Assert.AreEqual(before + 2, sfx.ClicksPlayed, "색 단축키");
             }
@@ -421,7 +584,8 @@ namespace PentaBrick.PlayTests
             Assert.IsNotNull(ByName<VisualElement>("score"));
             Assert.IsNotNull(ByName<VisualElement>("timer"));
             // 3D 카메라는 가운데 영역에만 그리므로, HUD 띠가 투명하면 지난 프레임 글자(바뀌는 시간)가 지워지지 않고 겹친다.
-            Assert.AreEqual(1f, ByName<VisualElement>("hud").resolvedStyle.backgroundColor.a, 0.001f, "HUD 띠는 불투명");
+            Assert.AreEqual(0f, ByName<VisualElement>("hud").resolvedStyle.backgroundColor.a, 0.001f, "플로팅 HUD 바깥은 투명");
+            Assert.AreEqual(new Rect(0, 0, 1, 1), Camera.main.rect, "3D 화면은 HUD 뒤까지 전체 화면");
             Assert.IsFalse(ByName<VisualElement>("view-top").ClassListContains("match"), "내 모형 평면도 표시를 끄면 일치 표시 없음");
             yield return ClickName("pause");
             Assert.IsTrue(ui.IsMenuOpen);
@@ -434,23 +598,28 @@ namespace PentaBrick.PlayTests
             yield return null;
             var state = editor.State;
             Assert.AreEqual(0, Live<Label>().Where(l => l.text.StartsWith("블록 사용")).ToList().Count, "오른쪽 패널 소제목 없음");
-            for (int c = 1; c <= 6; c++) Assert.AreEqual(state.Puzzle.Counts[c] > 0, root.Q("color-" + c) != null, "문제에 있는 색만 칩: " + c);
-            yield return ClickName("tool-paint");
-            Assert.AreEqual(Tool.Paint, state.Tool);
-            Assert.IsTrue(ByName<VisualElement>("tool-paint").ClassListContains("selected"));
-            state.SetTool(Tool.Erase); // 단축키와 같은 경로
+            for (int c = 1; c <= 6; c++) Assert.AreEqual(state.Puzzle.HasColor(c), root.Q("color-" + c) != null, "문제에 있는 색만 칩: " + c);
+            Assert.IsNull(root.Q("tool-paint"), "칠하기 도구 없음");
+            Assert.AreEqual("7", ByName<Label>("block-total").text, "써야 하는 블록 수를 크게 표시");
+            yield return ClickName("tool-erase");
+            Assert.AreEqual(Tool.Erase, state.Tool);
+            state.SetTool(Tool.Place); // 단축키와 같은 경로
             yield return null;
-            Assert.IsTrue(ByName<VisualElement>("tool-erase").ClassListContains("selected"), "단축키로 바꿔도 강조가 따라감");
-            Assert.IsFalse(ByName<VisualElement>("tool-paint").ClassListContains("selected"));
+            Assert.IsTrue(ByName<VisualElement>("tool-place").ClassListContains("selected"), "단축키로 바꿔도 강조가 따라감");
+            Assert.IsFalse(ByName<VisualElement>("tool-erase").ClassListContains("selected"));
             yield return ClickName("color-3");
             Assert.AreEqual(3, state.Color);
             Assert.IsTrue(ByName<VisualElement>("color-3").ClassListContains("selected"));
+            Assert.AreEqual("2", ByName<VisualElement>("color-3").Q<Label>(className: "key-badge").text, "노랑은 p1의 두 번째 색이라 2번");
+            Assert.AreEqual("4", ByName<VisualElement>("color-5").Q<Label>(className: "key-badge").text, "파랑은 네 번째 색");
             Assert.IsFalse(ByName<Button>("submit").enabledSelf);
             Assert.IsFalse(ByName<Button>("undo").enabledSelf);
             state.SetTool(Tool.Place);
             state.Place(0, 0);
             yield return null;
             Assert.IsTrue(ByName<Button>("undo").enabledSelf);
+            Assert.IsTrue(ByName<Button>("submit").enabledSelf, "블록을 다 쓰지 않아도 제출할 수 있다");
+            Assert.AreEqual("1 / 7", ByName<Label>("block-counter").text);
             yield return ClickName("undo");
             Assert.AreEqual(0, state.UsedTotal);
             Assert.IsTrue(ByName<Button>("redo").enabledSelf);
@@ -479,11 +648,17 @@ namespace PentaBrick.PlayTests
             Assert.IsTrue(picked == front || front.Contains(picked), "팝업이 떠 있어도 평면도 카드가 눌린다");
             yield return ClickName("view-front");
             Assert.AreEqual(ViewDir.Front, ui.ExpandedView, "결과 중에도 평면도 카드로 시점을 돌릴 수 있다");
-            yield return ClickName("result-answer");
+            Assert.IsNull(root.Q("result-retry"), "불가능 선언은 다시 도전 없음");
+            yield return ClickName("result-reveal");
             Assert.IsTrue(state.ShowingAnswer);
             Assert.IsNull(root.Q("tray"), "정답을 볼 때는 트레이를 숨김");
-            Assert.AreEqual(0, Live<Button>().Where(b => b.name == "result-answer").ToList().Count, "이미 정답을 보는 중");
+            Assert.IsTrue(ByName<VisualElement>("result-show-answer").ClassListContains("selected"));
             yield return Save("ui-result-answer.png");
+            yield return ClickName("result-show-mine");
+            Assert.IsFalse(state.ShowingAnswer);
+            Assert.AreEqual(0, state.UsedTotal, "내가 배치한 모형(빈 모형)");
+            yield return ClickName("result-show-answer");
+            Assert.IsTrue(state.ShowingAnswer);
             yield return ClickName("result-next");
             Assert.AreEqual("p2", state.Puzzle.Id);
             Assert.AreEqual(Phase.Playing, state.Phase);
@@ -492,12 +667,12 @@ namespace PentaBrick.PlayTests
         }
 
         [UnityTest]
-        public IEnumerator 오답이면_틀린_평면도_카드에_표시한다()
+        public IEnumerator 오답이면_틀린_평면도_카드에_표시하고_다시_도전한다()
         {
             ui.Play(null);
             yield return null;
             var state = editor.State;
-            // 색 번호 순서대로 왼쪽 뒤 칸부터 채워 틀린 모형을 만든다.
+            // 정답의 색 개수대로 왼쪽 뒤 칸부터 채워 틀린 모형을 만든다.
             int x = 0, z = 0;
             for (int c = 1; c <= 6; c++)
                 for (int n = 0; n < state.Puzzle.Counts[c]; n++)
@@ -514,7 +689,8 @@ namespace PentaBrick.PlayTests
             yield return null;
             yield return ClickName("submit");
             Assert.IsFalse(state.Result.Correct, "이 채우기는 p1의 정답이 아니어야 한다");
-            Assert.AreEqual(1, CountLabels("오답"));
+            Assert.AreEqual(1, CountLabels("아직 달라요"));
+            Assert.AreEqual(0, state.Score, "감점 없음");
             bool anyWrong = false;
             for (int i = 0; i < 5; i++)
             {
@@ -524,6 +700,11 @@ namespace PentaBrick.PlayTests
             }
             Assert.IsTrue(anyWrong);
             yield return Save("ui-result-wrong.png");
+            var model = state.Model;
+            yield return ClickName("result-retry");
+            Assert.AreEqual(Phase.Playing, state.Phase);
+            Assert.AreSame(model, state.Model, "놓은 블록 그대로 이어서");
+            Assert.IsNotNull(root.Q("tray"));
         }
 
         [UnityTest]
@@ -537,15 +718,16 @@ namespace PentaBrick.PlayTests
             Assert.IsTrue(ui.IsPortrait);
             Assert.AreEqual(ViewDir.Front, ui.ExpandedView, "배치가 바뀌어도 펼친 카드 유지");
             Assert.LessOrEqual(root.worldBound.width, 600f, "세로 화면은 폰 폭 기준으로 배치(가로 1280 기준을 줄여 쓰지 않음)");
+            yield return Save("ui-portrait-game.png");
             var screen = root.worldBound;
-            foreach (var name in new[] { "pause", "tool-place", "tool-paint", "tool-erase", "undo", "redo", "camera", "impossible", "submit", "view-top", "view-right", "timer" })
+            foreach (var name in new[] { "pause", "tool-place", "tool-erase", "block-count", "undo", "redo", "camera", "impossible", "submit", "view-top", "view-right", "timer" })
             {
                 var e = ByName<VisualElement>(name).worldBound;
                 Assert.IsTrue(screen.Contains(e.min) && screen.Contains(e.max), name + " 화면 밖: " + e);
-                if (!name.StartsWith("view") && name != "timer") Assert.GreaterOrEqual(Mathf.Min(e.width, e.height), 44f - 1.5f, name + " 44px 미만"); // 실제 픽셀에 맞춰 반올림되므로 1픽셀 여유
+                if (!name.StartsWith("view") && name != "timer" && name != "block-count") Assert.GreaterOrEqual(Mathf.Min(e.width, e.height), 44f - 1.5f, name + " 44px 미만: " + e); // 실제 픽셀에 맞춰 반올림되므로 1픽셀 여유
             }
             for (int c = 1; c <= 6; c++)
-                if (editor.State.Puzzle.Counts[c] > 0)
+                if (editor.State.Puzzle.HasColor(c))
                 {
                     var chip = ByName<VisualElement>("color-" + c).worldBound;
                     Assert.IsTrue(screen.Contains(chip.min) && screen.Contains(chip.max), "color-" + c);
@@ -662,7 +844,7 @@ namespace PentaBrick.PlayTests
 
             yield return Hover(ByName<Button>("submit"), true); // 글자가 있는 버튼으로 옮기면
             yield return new WaitForSecondsRealtime(0.45f);
-            Assert.AreEqual("블록을 모두 쓴 모형을 제출 (정답 +1, 오답 −1)", ByName<Label>("tooltip").text, "툴팁 문장이 있는 버튼은 모두 보여 준다");
+            Assert.AreEqual("지금 모형을 제출 (정답 +1, 오답은 감점 없이 다시 도전)", ByName<Label>("tooltip").text, "툴팁 문장이 있는 버튼은 모두 보여 준다");
         }
 
         [UnityTest]
@@ -837,7 +1019,7 @@ namespace PentaBrick.PlayTests
             yield return null;
             Assert.IsTrue(ui.IsMenuOpen);
             Assert.IsFalse(editor.enabled, "일시정지 창이 떠 있는 동안 편집 입력을 막는다");
-            Assert.AreEqual(1, CountLabels("샘플 1 / 6"), "제목은 문제 이름");
+            Assert.AreEqual(1, ByName<VisualElement>("pause-menu").Query<Label>().Where(l => l.text == "샘플 1 / 6").ToList().Count, "일시정지 창 제목은 문제 이름");
             Assert.AreEqual(0, CountButtons("난이도 변경"));
             Assert.IsFalse(ByName<Button>("pause-restart").enabledSelf, "놓은 블록이 없으면 다시 시작 비활성");
             Assert.IsNull(root.Q("pause-copy"), "샘플은 코드 복사 없음");
@@ -912,7 +1094,7 @@ namespace PentaBrick.PlayTests
 
             Assert.IsTrue(state.CanSubmit);
             Assert.AreEqual(9 + 7, editor.transform.Find("Blocks").childCount, "바닥 9칸 + 블록 7개");
-            foreach (var r in editor.GetComponentsInChildren<Renderer>(true))
+            foreach (var r in editor.transform.Find("Blocks").GetComponentsInChildren<Renderer>(true))
                 Assert.AreEqual("Block", r.sharedMaterial.name, $"{r.name}: 빌드에 포함되는 Resources 머티리얼이어야 한다(기본 머티리얼은 빌드에서 보라색)");
 
             // 앞-오른쪽 칸(x=2, z=2)의 노랑 블록은 월드 (1, 0.5, -1)에 있어야 하고 화면에서 클릭된다.

@@ -95,7 +95,7 @@ namespace PentaBrick.Tests
                     Assert.IsNull(puzzle.Answer);
                     StringAssert.Contains("원래 풀 수 있는 문제", puzzle.Reason);
                     Assert.AreEqual(SolveResult.Unsolvable, Solver.Solve(puzzle, out Model _));
-                    Assert.AreEqual(Generator.GenerateSolvable(difficulty, seed).Counts.Sum(), puzzle.Counts.Sum(), "총 블록 수는 그대로");
+                    CollectionAssert.AreEqual(Generator.GenerateSolvable(difficulty, seed).Counts, puzzle.Counts, "쓸 수 있는 색은 그대로");
                 }
                 double ratio = impossible / (double)total;
                 Assert.IsTrue(ratio >= 0.10 && ratio <= 0.20, $"{difficulty}: 불가능 {impossible}/{total}");

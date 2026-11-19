@@ -55,7 +55,7 @@ namespace PentaBrick.View
             var help = Text(box, Application.isMobilePlatform
                 ? "탭: 선택한 도구 · 한 손가락 드래그: 회전 · 두 손가락 벌리기/모으기: 확대/축소"
                 : "좌클릭: 선택한 도구 · 우클릭: 지우기 · 드래그: 회전 · 휠: 확대/축소\n" +
-                  "1~6: 색 · Q/W/E: 놓기/칠하기/지우기 · Ctrl(⌘)+Z: 실행 취소", 10, false, DimColor);
+                  "1~6: 색 · Q/E: 놓기/지우기 · Ctrl(⌘)+Z: 실행 취소", 10, false, DimColor);
             help.style.marginTop = 14;
             help.style.whiteSpace = WhiteSpace.Normal;
             help.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -175,13 +175,20 @@ namespace PentaBrick.View
         {
             var page = Page();
             IconButton(Corner(page, true), "main-settings", Icon.Settings, "설정", OpenSettings);
-            Text(page, "PentaBrick", 56, true).style.marginBottom = 40;
+            BuildBrandPuzzle(page);
+            Text(page, "FIVE VIEWS. ONE SOLUTION.", 11, true, SelectColor).style.letterSpacing = 3;
+            var title = Text(page, "PENTA BRICK", portrait ? 44 : 64, true);
+            UseFont(title, "Fredoka-Static");
+            title.AddToClassList("game-title");
+            title.style.marginBottom = 4;
+            Text(page, "다섯 시선을 하나의 모형으로.", 16, false, DimColor).style.marginBottom = 28;
             var play = BigButton(page, "플레이", "", () => Show(UiScreen.DifficultySelect));
             play.name = "main-play";
-            play.style.backgroundColor = GoodColor;
-            play.style.color = Color.black;
+            play.style.backgroundColor = SelectColor;
+            play.style.color = PageColor;
             BigButton(page, "튜토리얼", "", StartTutorial).name = "main-tutorial";
-            if (state.Score != 0) Text(page, $"★ {state.Score}", 15, true, DimColor).style.marginTop = 24;
+            if (state.Score != 0) Text(page, $"★ {state.Score}", 15, true, DimColor).style.marginTop = 18;
+            Text(page, "관찰하고 · 추론하고 · 쌓아보세요", 11, false, DimColor).style.marginTop = 22;
         }
 
         /// <summary>모드 선택: 타일 네 개. 뒤로는 왼쪽 위, 문제 코드는 오른쪽 위 작은 창.</summary>
@@ -190,7 +197,9 @@ namespace PentaBrick.View
             var page = Page();
             IconButton(Corner(page, false), "mode-back", Icon.Back, "메인으로 (Esc)", () => Show(UiScreen.Main));
             IconButton(Corner(page, true), "mode-code", Icon.Code, "문제 코드로 열기", () => { codeOpen = true; codeMessage = ""; dirty = true; });
-            Text(page, "모드 선택", 28, true).style.marginBottom = 28;
+            Text(page, "CHOOSE YOUR CHALLENGE", 11, true, SelectColor).style.letterSpacing = 3;
+            Text(page, "모드 선택", 32, true).style.marginTop = 8;
+            Text(page, "작은 격자부터, 더 깊은 공간 추론까지", 13, false, DimColor).style.marginBottom = 24;
 
             var tiles = Row(page);
             tiles.style.flexWrap = Wrap.Wrap;
@@ -207,7 +216,26 @@ namespace PentaBrick.View
 
         private static void ModeTile(VisualElement parent, string name, string title, string detail, Action onClick)
         {
-            var tile = new Button(onClick) { name = name, text = $"{title}\n<size=13><color=#9aa0ad>{detail}</color></size>" };
+            var tile = new Button(onClick) { name = name, text = "" };
+            tile.style.alignItems = Align.FlexStart;
+            tile.style.justifyContent = Justify.Center;
+            tile.style.paddingLeft = tile.style.paddingRight = 16;
+            int level = name == "mode-sample" ? 0 : name == "mode-easy" ? 1 : name == "mode-normal" ? 2 : 3;
+            Color accent = level == 0 ? SelectColor : level == 1 ? GoodColor : level == 2 ? (Color)ColorValues[3] : (Color)ColorValues[6];
+            var dots = Row(tile);
+            dots.pickingMode = PickingMode.Ignore;
+            for (int i = 0; i < 4; i++)
+            {
+                var dot = new VisualElement { pickingMode = PickingMode.Ignore };
+                dot.style.width = dot.style.height = 12;
+                dot.style.marginRight = 5;
+                dot.style.backgroundColor = i <= level ? accent : LineColor;
+                Round(dot, 3);
+                dots.Add(dot);
+            }
+            Text(tile, title, 22, true).style.marginTop = 18;
+            Text(tile, detail, 12, false, DimColor).style.marginTop = 4;
+            Text(tile, level == 0 ? "차근차근 익히기" : level == 1 ? "가볍게 시작하기" : level == 2 ? "추론에 집중하기" : "한계에 도전하기", 10, false, accent).style.marginTop = 10;
             tile.style.width = 140;
             tile.style.height = 160;
             tile.style.marginLeft = tile.style.marginRight = tile.style.marginTop = tile.style.marginBottom = 8;
@@ -217,6 +245,8 @@ namespace PentaBrick.View
             tile.style.backgroundColor = CardColor;
             tile.style.borderTopLeftRadius = tile.style.borderTopRightRadius = tile.style.borderBottomLeftRadius = tile.style.borderBottomRightRadius = 18;
             Border(tile, LineColor, 1);
+            tile.style.borderTopWidth = 3;
+            tile.style.borderTopColor = accent;
             parent.Add(tile);
         }
 

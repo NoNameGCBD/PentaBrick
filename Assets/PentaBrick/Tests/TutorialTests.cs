@@ -92,7 +92,7 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void 틀리게_제출하면_다시_하기로_같은_문제를_새로_연다()
+        public void 틀리게_제출하면_다시_하기로_모형을_그대로_두고_이어서_푼다()
         {
             GoTo("완성");
             game.Reset();
@@ -108,7 +108,7 @@ namespace PentaBrick.Tests
 
             tutorial.Retry(game);
             Assert.AreEqual(Phase.Playing, game.Phase);
-            Assert.AreEqual(0, game.UsedTotal);
+            Assert.AreEqual(4, game.UsedTotal, "놓은 블록은 그대로");
             Assert.AreSame(Tutorial.BuildPuzzle, game.Puzzle);
             Assert.IsFalse(tutorial.NeedsRetry(game));
         }

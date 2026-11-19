@@ -1,18 +1,18 @@
 # PentaBrick (Unity)
 
 웹 프로토타입(저장소 루트)을 Unity로 옮기는 졸업작품 프로젝트입니다.
-계획: [docs/개발계획서.md](../docs/개발계획서.md) · 명세: [docs/기획명세서.md](../docs/기획명세서.md)
+계획: [docs/개발계획서.md](docs/개발계획서.md) · 명세: [docs/기획명세서.md](docs/기획명세서.md)
 
 ## 여는 방법
 
 1. Unity Hub에 로그인해 라이선스(Personal)를 활성화합니다.
-2. Unity Hub > Add > Add project from disk 에서 이 `unity` 폴더를 고릅니다. 에디터 버전은 6000.6.1f1 입니다.
+2. Unity Hub > Add > Add project from disk 에서 이 프로젝트 폴더를 고릅니다. 에디터 버전은 6000.6.1f1 입니다.
 
 ## 테스트
 
 - Unity: Window > General > Test Runner > EditMode / PlayMode > Run All
   (PlayMode 테스트는 실제 씬에서 메뉴를 거쳐 블록을 쌓고, 각 화면을 `Logs/ui-*.png`로 저장합니다)
-- 명령줄(Unity 없이, Core 로직만): `dotnet test unity/tools/dotnet-tests`
+- 명령줄(Unity 없이, Core 로직만): `dotnet test tools/dotnet-tests`
 
 두 방법은 `Assets/PentaBrick/Tests`의 같은 테스트 소스를 씁니다.
 
@@ -30,4 +30,10 @@ Assets/PentaBrick/
 tools/dotnet-tests/   명령줄 테스트용 프로젝트 (Assets의 소스를 링크)
 ```
 
-같은 난이도와 seed는 웹 프로토타입과 같은 문제를 만듭니다(테스트로 고정).
+같은 난이도와 seed는 웹 프로토타입과 같은 정답 모형을 만듭니다(테스트로 고정). 판정이 "평면도 + 블록 총수"로 바뀌어, 불가능 문제는 웹 프로토타입과 다를 수 있습니다.
+
+## 코드 점검 및 UI 개선
+
+[2026-11-17 코드 분석과 개선 내역](docs/code-review-2026-11-17.md)
+
+[아케이드 HUD 구현 및 조작 안내](docs/arcade-hud-2026-11-17.md)

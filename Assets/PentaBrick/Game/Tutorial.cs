@@ -56,25 +56,25 @@ namespace PentaBrick.Game
                 "각 칸에는 그 방향에서 가장 먼저 보이는 블록의 색이 나옵니다. 카드를 누르면 크게 펼쳐지고, 옆에 지금 만든 모형의 평면도('내 모형')가 함께 보입니다(연습 모드 전용). 내 모형과 같아진 카드는 테두리가 초록색이 됩니다.",
                 BuildPuzzle),
             new TutorialStep("블록 놓기",
-                "아래쪽 색 칩에서 색을 고르고(숫자 키 1~6) 가운데 바닥 칸을 클릭(터치는 탭)해 블록을 하나 놓아 보세요.",
+                "아래쪽 색 칩에서 색을 고르고(숫자 키 1~6) 가운데 바닥 칸을 클릭(터치는 탭)해 블록을 하나 놓아 보세요. 써야 하는 블록 수는 평면도 옆에 크게 나옵니다.",
                 BuildPuzzle, game => game.UsedTotal >= 1),
             new TutorialStep("쌓기",
-                "블록이 있는 칸을 클릭(탭)하면 그 위에 쌓입니다. 블록을 공중에 띄울 수는 없습니다. 한 칸에 블록 두 개를 쌓아 보세요.",
+                "블록이 있는 칸을 클릭(탭)하면 그 위에 쌓입니다. 블록을 공중에 띄울 수는 없고, 격자 위의 상한선 높이까지만 쌓을 수 있습니다. 한 칸에 블록 두 개를 쌓아 보세요.",
                 BuildPuzzle, HasStack),
             new TutorialStep("보는 방향 바꾸기와 고치기",
                 "드래그하면 회전, 휠(터치는 두 손가락 벌리기·모으기)로 확대·축소합니다. 위쪽 평면도 카드를 누르면 그 방향에서 보고, 카메라 아이콘으로 돌아옵니다. " +
-                "우클릭이나 아래 지우기 도구(E)로 블록을 지우고, 칠하기 도구(W)로 색을 바꾸며, 되돌리기 아이콘이나 Ctrl(⌘)+Z로 되돌립니다.",
+                "우클릭이나 아래 지우기 도구(E)로 블록을 지우면 그 위에 쌓인 블록도 함께 지워집니다. 되돌리기 아이콘이나 Ctrl(⌘)+Z로 되돌립니다.",
                 BuildPuzzle),
             new TutorialStep("모형 완성하기",
-                "위쪽 평면도 카드가 모두 초록 테두리가 되도록 만든 뒤 '제출'을 누르세요. 주어진 블록은 남김없이 정확히 다 써야 제출할 수 있습니다.",
+                "평면도 카드가 모두 초록 테두리가 되도록 만든 뒤 '정답 확인'을 누르세요. 색은 자유롭게 써도 되지만, 블록은 주어진 개수를 정확히 다 써야 정답입니다.",
                 BuildPuzzle, game => game.Phase == Phase.Result && !game.DeclaredImpossible && game.Result.Correct),
             new TutorialStep("점수",
-                "정답 제출은 맞으면 +1점, 틀리면 −1점입니다. 난이도 모드에서는 기준 시간 안에 맞히면 시간 보너스 +1점이 더해집니다. " +
+                "정답을 맞히면 +1점입니다. 틀려도 감점 없이 다시 도전할 수 있고, '답 확인하기'로 정답 모형을 볼 수도 있습니다(점수 없음). 난이도 모드에서는 기준 시간 안에 맞히면 시간 보너스 +1점이 더해집니다. " +
                 "튜토리얼과 '내 모형의 평면도 표시'를 켠 연습 문제는 점수에 반영되지 않습니다.",
                 BuildPuzzle),
             new TutorialStep("불가능한 문제",
                 "어떤 문제는 평면도와 블록 수가 서로 맞지 않아 만들 수 없습니다. 앞 평면도의 왼쪽 아래 칸을 보세요. " +
-                "빨강이 보여야 하지만 주어진 블록은 초록 하나뿐입니다. 이럴 때는 '불가능'을 누릅니다.",
+                "빨강이 보여야 하지만 쓸 수 있는 블록은 초록 하나뿐입니다. 이럴 때는 '불가능'을 누릅니다.",
                 ImpossiblePuzzle, game => game.Phase == Phase.Result && game.DeclaredImpossible && game.Result.Correct),
             new TutorialStep("불가능 선언",
                 "불가능 선언은 맞으면 +2점, 틀리면 −2점입니다. 확신이 들 때만 누르세요. 난이도 모드 문제 중 일부(10~20%)는 불가능한 문제입니다.",
@@ -124,8 +124,12 @@ namespace PentaBrick.Game
         /// <summary>행동 단계에서 틀린 결과가 나왔는지(다시 하기가 필요한지).</summary>
         public bool NeedsRetry(GameState game) => !Current.IsManual && game.Phase == Phase.Result && !Current.Done(game);
 
-        /// <summary>현재 단계의 문제를 처음부터 다시 연다.</summary>
-        public void Retry(GameState game) => game.OpenCustom(Current.Puzzle);
+        /// <summary>오답 제출이면 모형을 그대로 두고 이어서 풀고, 아니면 현재 단계의 문제를 처음부터 다시 연다.</summary>
+        public void Retry(GameState game)
+        {
+            if (game.CanRetry) game.Retry();
+            else game.OpenCustom(Current.Puzzle);
+        }
 
         /// <summary>이 튜토리얼의 문제인지. 다른 문제로 바뀌면 튜토리얼을 끝낸다.</summary>
         public bool Owns(Puzzle puzzle) => puzzle == BuildPuzzle || puzzle == ImpossiblePuzzle;

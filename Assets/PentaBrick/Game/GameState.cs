@@ -5,7 +5,7 @@ using PentaBrick.Core;
 
 namespace PentaBrick.Game
 {
-    public enum Tool { Place, Paint, Erase }
+    public enum Tool { Place, Erase }
 
     public enum Phase { Playing, Result }
 
@@ -46,7 +46,11 @@ namespace PentaBrick.Game
         public int TimeBonus { get; private set; }
         /// <summary>결과 화면에서: 이번 문제로 실제로 바뀐 점수(연습이면 0).</summary>
         public int LastDelta { get; private set; }
+        /// <summary>답 확인 화면에서 정답 모형을 보는 중(false면 내가 배치한 모형).</summary>
         public bool ShowingAnswer { get; private set; }
+        /// <summary>오답 뒤 "답 확인하기"로 문제를 마쳤다. 정답 모형과 내 모형을 번갈아 볼 수 있다.</summary>
+        public bool Revealed { get; private set; }
+        private Model playerModel; // 답 확인 중 정답 모형을 보는 동안 내 모형을 보관
         /// <summary>문제를 새로 시작할 때마다 1씩 는다(같은 문제를 다시 열어도). 효과음이 새 문제를 알아보는 데 쓴다.</summary>
         public int PuzzleSerial { get; private set; }
 
@@ -65,13 +69,19 @@ namespace PentaBrick.Game
 
         // --- 파생 값 ---
 
-        public int Remaining(int color) => Puzzle.Counts[color] - Model.CountColors()[color];
         public int UsedTotal => Model.TotalBlocks;
-        public int RequiredTotal { get { int sum = 0; foreach (int count in Puzzle.Counts) sum += count; return sum; } }
+        /// <summary>문제에서 써야 하는 블록 총수. 색별 개수는 정하지 않는다.</summary>
+        public int RequiredTotal => Puzzle.Total;
+        /// <summary>블록을 더 놓을 수 있는지(총수까지만).</summary>
+        public bool HasBlocksLeft => UsedTotal < RequiredTotal;
         public bool CanUndo => Phase == Phase.Playing && past.Count > 0;
         public bool CanRedo => Phase == Phase.Playing && future.Count > 0;
-        /// <summary>블록을 정확히 다 썼을 때만 제출할 수 있다(실수로 인한 감점 방지).</summary>
-        public bool CanSubmit => Phase == Phase.Playing && UsedTotal == RequiredTotal;
+        /// <summary>블록을 하나라도 놓았으면 제출할 수 있다(다 쓰지 않았으면 오답으로 판정되고 다시 도전한다).</summary>
+        public bool CanSubmit => Phase == Phase.Playing && UsedTotal > 0;
+        /// <summary>오답 제출 뒤: 모형을 그대로 두고 이어서 풀 수 있다.</summary>
+        public bool CanRetry => Phase == Phase.Result && !Result.Correct && !DeclaredImpossible && !Revealed;
+        /// <summary>오답 뒤: 문제를 마치고 정답을 볼 수 있다.</summary>
+        public bool CanReveal => Phase == Phase.Result && !Result.Correct && !Revealed;
         /// <summary>경과 시간. 결과 화면에서는 제출 시점에 멈춘다.</summary>
         public double ElapsedMs => Phase == Phase.Result ? resultElapsedMs : nowMs() - startedAt;
 
@@ -131,7 +141,8 @@ namespace PentaBrick.Game
             Phase = Phase.Playing;
             Result = null;
             DeclaredImpossible = false;
-            ShowingAnswer = false;
+            ShowingAnswer = Revealed = false;
+            playerModel = null;
             Unscored = ShowMine || IsCustom;
             TimeBonus = LastDelta = 0;
             startedAt = nowMs();
@@ -149,14 +160,10 @@ namespace PentaBrick.Game
 
         public void Place(int x, int z)
         {
-            if (Remaining(Color) > 0) Commit(Model.Place(x, z, Color));
+            if (HasBlocksLeft) Commit(Model.Place(x, z, Color));
         }
 
-        public void Paint(int x, int y, int z)
-        {
-            if (Remaining(Color) > 0) Commit(Model.Paint(x, y, z, Color));
-        }
-
+        /// <summary>블록과 그 위에 쌓인 블록을 모두 지운다.</summary>
         public void Erase(int x, int y, int z) => Commit(Model.Remove(x, y, z));
 
         /// <summary>모형을 비운다. 실행 취소로 되돌릴 수 있다.</summary>
@@ -195,9 +202,17 @@ namespace PentaBrick.Game
         /// <summary>문제에 없는 색은 선택할 수 없다.</summary>
         public void SetColor(int color)
         {
-            if (!Colors.IsColor(color) || Puzzle.Counts[color] == 0) return;
+            if (!Puzzle.HasColor(color)) return;
             Color = color;
             Changed?.Invoke();
+        }
+
+        /// <summary>숫자 키: 문제의 색 중 slot번째(1부터)를 고른다. 그런 색이 없으면 false.</summary>
+        public bool SetColorSlot(int slot)
+        {
+            if (slot < 1 || slot > Puzzle.Palette.Length) return false;
+            SetColor(Puzzle.Palette[slot - 1]);
+            return true;
         }
 
         public void SetTool(Tool tool)
@@ -215,7 +230,7 @@ namespace PentaBrick.Game
 
         // --- 제출 ---
 
-        /// <summary>규칙 4: 모형 제출.</summary>
+        /// <summary>규칙 4: 모형 제출. 오답이면 감점 없이 결과를 보여 주고, 다시 도전하거나 답을 확인한다.</summary>
         public void Submit()
         {
             if (CanSubmit) Finish(Judge.ScoreSubmit(Model, Puzzle), false);
@@ -241,12 +256,41 @@ namespace PentaBrick.Game
             Changed?.Invoke();
         }
 
-        /// <summary>결과 화면에서 정답 모형을 보여준다(불가능 문제는 정답이 없다).</summary>
+        /// <summary>오답 결과에서 "다시 도전": 모형과 실행 취소 기록을 그대로 두고 이어서 푼다. 결과 화면에 머문 시간은 세지 않는다.</summary>
+        public void Retry()
+        {
+            if (!CanRetry) return;
+            startedAt = nowMs() - resultElapsedMs;
+            Result = null;
+            Phase = Phase.Playing;
+            Changed?.Invoke();
+        }
+
+        /// <summary>오답 결과에서 "답 확인하기": 문제를 마치고 정답 모형(있으면)을 보여 준다. 점수는 바뀌지 않는다.</summary>
+        public void Reveal()
+        {
+            if (!CanReveal) return;
+            Revealed = true;
+            playerModel = Model;
+            if (Puzzle.Answer != null) ShowAnswer();
+            else Changed?.Invoke();
+        }
+
+        /// <summary>답 확인 중 정답 모형을 본다(불가능 문제는 정답이 없다).</summary>
         public void ShowAnswer()
         {
-            if (Phase != Phase.Result || Puzzle.Answer == null) return;
+            if (!Revealed || Puzzle.Answer == null) return;
             Model = Puzzle.Answer;
             ShowingAnswer = true;
+            Changed?.Invoke();
+        }
+
+        /// <summary>답 확인 중 내가 배치한 모형을 본다.</summary>
+        public void ShowMyModel()
+        {
+            if (!Revealed) return;
+            Model = playerModel;
+            ShowingAnswer = false;
             Changed?.Invoke();
         }
     }

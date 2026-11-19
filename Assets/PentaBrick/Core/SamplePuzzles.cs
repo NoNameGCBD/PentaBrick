@@ -52,9 +52,9 @@ namespace PentaBrick.Core
                 "R  Y   .  GGG",
             })),
 
-            // p5 (불가능, 블록 수 모순): 초록 하나를 보라로 바꿨다.
-            // 모든 블록이 어느 방향에서든 보이는 모형이라 색 배치가 완전히 정해진다.
-            // 평면도상 초록이 2개 필요한데 1개뿐이고, 보라는 숨길 자리가 없다.
+            // p5 (불가능, 블록 수 모순): 총수를 하나 늘렸다.
+            // 모든 블록이 어느 방향에서든 보이는 모형이라 블록 배치가 완전히 정해진다.
+            // 남는 블록 하나를 어디에 두어도 평면도가 바뀐다.
             Impossible("p5",
                 Model.Parse(new[]
                 {
@@ -62,12 +62,8 @@ namespace PentaBrick.Core
                     ". GG .",
                     "Y .  O",
                 }),
-                "평면도대로라면 가운데 기둥은 초록 2개여야 하는데 초록 블록은 1개뿐입니다. 남는 보라 블록은 어느 평면도에도 보이지 않아야 하지만 숨길 자리가 없습니다.",
-                (views, counts) =>
-                {
-                    counts[Colors.Green] -= 1;
-                    counts[Colors.Purple] += 1;
-                }),
+                "평면도대로라면 모든 블록이 어느 방향에서든 보이므로 블록은 정확히 6개여야 합니다. 7개를 모두 쓰면 남는 1개를 숨길 자리가 없습니다.",
+                (views, counts) => { }, totalChange: 1),
 
             // p6: 4×4×4, 안쪽에 가려진 블록이 있어 정답이 여러 개다.
             Puzzle.FromModel("p6", Model.Parse(new[]
@@ -79,14 +75,14 @@ namespace PentaBrick.Core
             })),
         };
 
-        /// <summary>가능한 모형(baseModel)의 평면도나 블록 수를 tamper로 고쳐 불가능 문제를 만든다.</summary>
-        private static Puzzle Impossible(string id, Model baseModel, string reason, Action<int[][,], int[]> tamper)
+        /// <summary>가능한 모형(baseModel)의 평면도를 tamper로 고치거나 블록 총수를 바꿔 불가능 문제를 만든다.</summary>
+        private static Puzzle Impossible(string id, Model baseModel, string reason, Action<int[][,], int[]> tamper, int totalChange = 0)
         {
             var views = Projection.ProjectAll(baseModel);
             var counts = baseModel.CountColors();
             tamper(views, counts);
             return new Puzzle(id, baseModel.Size, baseModel.Height, views, counts,
-                solvable: false, answer: null, reason: reason);
+                solvable: false, answer: null, reason: reason, total: baseModel.TotalBlocks + totalChange);
         }
     }
 }

@@ -56,32 +56,29 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void 놓기는_남은_개수를_줄이고_다_쓰면_거부한다()
+        public void 색별_개수는_자유롭고_총수까지만_놓을_수_있다()
         {
-            game.SetColor(B); // p1의 파랑은 1개
-            Assert.AreEqual(1, game.Remaining(B));
-            game.Place(0, 0);
-            Assert.AreEqual(0, game.Remaining(B));
-            game.Place(1, 1);
-            Assert.AreEqual(1, game.UsedTotal);
+            game.SetColor(B); // 정답의 파랑은 1개지만 색별 제한은 없다
+            for (int i = 0; i < 9; i++) game.Place(i % 3, i / 3);
+            Assert.AreEqual(7, game.UsedTotal, "총 7개까지만");
+            Assert.IsFalse(game.HasBlocksLeft);
+            Assert.AreEqual(7, game.Model.CountColors()[B]);
         }
 
         [Test]
-        public void 칠하기와_지우기()
+        public void 지우면_그_위에_쌓인_블록도_함께_지워진다()
         {
             game.SetColor(G);
             game.Place(0, 0);
-            game.Place(0, 0);
             game.SetColor(R);
-            game.Paint(0, 0, 0);
-            CollectionAssert.AreEqual(new[] { R, G }, game.Model.Column(0, 0));
+            game.Place(0, 0);
+            game.Place(0, 0);
+            game.Erase(0, 1, 0);
+            CollectionAssert.AreEqual(new[] { G }, game.Model.Column(0, 0));
+            game.Undo();
+            Assert.AreEqual(3, game.UsedTotal);
             game.Erase(0, 0, 0);
-            CollectionAssert.AreEqual(new[] { G }, game.Model.Column(0, 0));
-
-            game.SetColor(B);
-            game.Place(1, 1);
-            game.Paint(0, 0, 0); // 파랑은 이미 다 썼다
-            CollectionAssert.AreEqual(new[] { G }, game.Model.Column(0, 0));
+            Assert.AreEqual(0, game.UsedTotal);
         }
 
         [Test]
@@ -92,6 +89,19 @@ namespace PentaBrick.Tests
             game.SetColor(99);
             game.SetColor(-1);
             Assert.AreEqual(R, game.Color);
+        }
+
+        [Test]
+        public void 숫자_키는_문제의_색을_순서대로_1번부터_고른다()
+        {
+            CollectionAssert.AreEqual(new[] { R, Y, G, B }, game.Puzzle.Palette); // p1: 주황·보라 없음
+            Assert.IsTrue(game.SetColorSlot(2));
+            Assert.AreEqual(Y, game.Color, "2번 = 두 번째 색(노랑), 색 번호 2(주황)가 아님");
+            Assert.IsTrue(game.SetColorSlot(4));
+            Assert.AreEqual(B, game.Color);
+            Assert.IsFalse(game.SetColorSlot(5), "색이 4개뿐");
+            Assert.IsFalse(game.SetColorSlot(0));
+            Assert.AreEqual(B, game.Color);
         }
 
         [Test]
@@ -116,12 +126,17 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void 블록을_다_써야_제출할_수_있고_정답이면_1점()
+        public void 블록을_다_쓰지_않아도_제출할_수_있고_정답이면_1점()
         {
+            Assert.IsFalse(game.CanSubmit, "빈 모형은 제출할 수 없다");
             game.Place(0, 0);
-            Assert.IsFalse(game.CanSubmit);
+            Assert.IsTrue(game.CanSubmit);
             game.Submit();
-            Assert.AreEqual(Phase.Playing, game.Phase);
+            Assert.AreEqual(Phase.Result, game.Phase);
+            Assert.IsFalse(game.Result.Correct);
+            Assert.IsFalse(game.Result.CountsMatch);
+            Assert.AreEqual(0, game.Score, "오답은 감점하지 않는다");
+            game.Retry();
             game.Undo();
 
             Build(game.Puzzle.Answer);
@@ -142,6 +157,9 @@ namespace PentaBrick.Tests
         {
             game.DeclareImpossible();
             Assert.AreEqual(-2, game.Score);
+            Assert.IsFalse(game.CanRetry, "불가능 선언은 다시 도전할 수 없다");
+            game.Retry();
+            Assert.AreEqual(Phase.Result, game.Phase);
             game.Place(0, 0);
             game.Undo();
             game.Reset();
@@ -152,16 +170,53 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void 틀린_모형을_제출하면_감점()
+        public void 틀린_모형은_감점_없이_이어서_다시_도전한다()
         {
             Build(game.Puzzle.Answer);
             game.SetColor(Y);
             game.Erase(2, 0, 2);
             game.Place(2, 0); // 노랑을 다른 칸으로
+            var wrong = game.Model;
+            clock += 3000;
             game.Submit();
             Assert.IsFalse(game.Result.Correct);
-            Assert.IsTrue(game.Result.CountsMatch);
-            Assert.AreEqual(-1, game.Score);
+            Assert.AreEqual(0, game.Score);
+            Assert.IsTrue(game.CanRetry && game.CanReveal);
+
+            clock += 60000; // 결과 화면에 머문 시간은 세지 않는다
+            game.Retry();
+            Assert.AreEqual(Phase.Playing, game.Phase);
+            Assert.AreSame(wrong, game.Model, "모형을 그대로 두고 이어서 푼다");
+            Assert.AreEqual(3000, game.ElapsedMs);
+            game.Undo(); // 기록도 남아 있다
+            game.Undo();
+            Assert.IsTrue(game.Model.SameAs(game.Puzzle.Answer));
+            game.Submit();
+            Assert.IsTrue(game.Result.Correct);
+            Assert.AreEqual(1, game.Score);
+        }
+
+        [Test]
+        public void 답_확인하기는_정답과_내_모형을_번갈아_보여준다()
+        {
+            game.Place(0, 0);
+            var mine = game.Model;
+            game.Reveal(); // 풀이 중에는 볼 수 없다
+            game.ShowAnswer();
+            Assert.IsFalse(game.Revealed || game.ShowingAnswer);
+
+            game.Submit();
+            game.Reveal();
+            Assert.IsTrue(game.Revealed);
+            Assert.IsFalse(game.CanRetry, "답을 본 뒤에는 다시 도전할 수 없다");
+            Assert.IsTrue(game.ShowingAnswer);
+            Assert.IsTrue(game.Model.SameAs(game.Puzzle.Answer));
+            game.ShowMyModel();
+            Assert.IsFalse(game.ShowingAnswer);
+            Assert.AreSame(mine, game.Model);
+            game.ShowAnswer();
+            Assert.IsTrue(game.ShowingAnswer);
+            Assert.AreEqual(0, game.Score, "답 확인은 점수에 영향이 없다");
         }
 
         [Test]
@@ -173,7 +228,9 @@ namespace PentaBrick.Tests
             game.DeclareImpossible(); // p1은 가능한 문제
             Assert.IsTrue(game.DeclaredImpossible);
             Assert.IsFalse(game.Result.Correct);
-            game.ShowAnswer();
+            game.ShowAnswer(); // 답 확인하기를 눌러야 볼 수 있다
+            Assert.IsFalse(game.ShowingAnswer);
+            game.Reveal();
             Assert.IsTrue(game.ShowingAnswer);
             Assert.IsTrue(game.Model.SameAs(game.Puzzle.Answer));
 
@@ -184,6 +241,7 @@ namespace PentaBrick.Tests
             game.DeclareImpossible();
             Assert.IsTrue(game.Result.Correct);
             Assert.AreEqual(0, game.Score); // -2 + 2
+            Assert.IsFalse(game.CanReveal, "맞혔으면 답 확인이 필요 없다");
             game.ShowAnswer(); // 정답이 없다
             Assert.IsFalse(game.ShowingAnswer);
         }

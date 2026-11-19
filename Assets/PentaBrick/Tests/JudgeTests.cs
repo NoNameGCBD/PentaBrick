@@ -21,19 +21,20 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void 평면도와_블록_수가_같으면_원본과_달라도_정답이다()
+        public void 평면도와_블록_총수가_같으면_원본과_달라도_정답이다()
         {
             var puzzle = Puzzle.FromModel("t", Cube("BG"));
             var other = Cube("GB");
             Assert.IsFalse(other.SameAs(puzzle.Answer));
             Assert.IsTrue(Judge.Check(other, puzzle).Correct);
+            Assert.IsTrue(Judge.Check(Cube("BB"), puzzle).Correct, "안 보이는 블록의 색별 개수는 자유");
         }
 
         [Test]
-        public void 평면도가_같아도_블록_수가_다르면_오답이다()
+        public void 평면도가_같아도_블록_총수가_다르면_오답이다()
         {
             var puzzle = Puzzle.FromModel("t", Cube("BG"));
-            var result = Judge.Check(Cube("BB"), puzzle);
+            var result = Judge.Check(M("RRR RRR RRR/RRR R RRR/RRR RRR RRR"), puzzle);
             Assert.IsTrue(result.ViewMatches.All(match => match), "평면도는 모두 일치해야 함");
             Assert.IsFalse(result.CountsMatch);
             Assert.IsFalse(result.Correct);
@@ -51,12 +52,12 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void 점수_제출은_1점_불가능은_2점()
+        public void 점수_제출은_정답_1점_오답_0점_불가능은_2점()
         {
             var solvable = SamplePuzzles.All.First(p => p.Solvable);
             var impossible = SamplePuzzles.All.First(p => !p.Solvable);
             Assert.AreEqual(1, Judge.ScoreSubmit(solvable.Answer, solvable).Delta);
-            Assert.AreEqual(-1, Judge.ScoreSubmit(Model.Empty(solvable.Size, solvable.Height), solvable).Delta);
+            Assert.AreEqual(0, Judge.ScoreSubmit(Model.Empty(solvable.Size, solvable.Height), solvable).Delta);
             Assert.AreEqual(2, Judge.ScoreImpossible(impossible).Delta);
             Assert.IsTrue(Judge.ScoreImpossible(impossible).Correct);
             Assert.AreEqual(-2, Judge.ScoreImpossible(solvable).Delta);
@@ -69,7 +70,7 @@ namespace PentaBrick.Tests
             var puzzle = Puzzle.FromModel("t", M("R . ./. . ./. . ."));
             var result = Judge.ScoreSubmit(M("R ./. ."), puzzle);
             Assert.IsFalse(result.Correct);
-            Assert.AreEqual(-1, result.Delta);
+            Assert.AreEqual(0, result.Delta);
         }
 
         [Test]
@@ -84,6 +85,7 @@ namespace PentaBrick.Tests
             Assert.IsNull(puzzle.Difficulty);
             Assert.IsNull(puzzle.Seed);
             CollectionAssert.AreEqual(new[] { 0, 3, 0, 0, 1, 1, 1 }, puzzle.Counts);
+            Assert.AreEqual(6, puzzle.Total);
             Assert.AreEqual(5, puzzle.Views.Length);
         }
     }

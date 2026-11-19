@@ -36,7 +36,13 @@ namespace PentaBrick.View
 
         private Camera cam;
         private Transform blocks; // 바닥 칸과 블록의 부모. 상태가 바뀌면 통째로 다시 만든다
+        private Model drawnModel;
+        private GameObject backdrop;
+        private Material backdropMaterial;
+        public int VisibleLayer { get; private set; } = -1;
         private Transform ghost;  // 놓기 미리보기
+        private Transform ceiling; // 높이 상한선: 격자 위 최대 높이에 그리는 반투명 테두리
+        private Puzzle ceilingFor;
         private float yaw, pitch, distance;
         private Vector2 pressPos;
         private bool dragging;
@@ -60,7 +66,20 @@ namespace PentaBrick.View
         private void Awake()
         {
             cam = Camera.main;
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color32(0x10, 0x1c, 0x30, 255);
             blockMaterial = Resources.Load<Material>("Block");
+            var backdropShader = Resources.Load<Shader>("ArcadeBackdrop");
+            if (backdropShader != null)
+            {
+                backdropMaterial = new Material(backdropShader);
+                backdrop = GameObject.CreatePrimitive(PrimitiveType.Quad);
+                backdrop.name = "Arcade radial backdrop";
+                Destroy(backdrop.GetComponent<Collider>());
+                backdrop.transform.SetParent(cam.transform, false);
+                backdrop.GetComponent<Renderer>().sharedMaterial = backdropMaterial;
+                backdrop.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
             ghost = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
             ghost.GetComponent<Renderer>().sharedMaterial = blockMaterial;
             ghost.name = "Ghost";
@@ -76,8 +95,9 @@ namespace PentaBrick.View
             {
                 if (State.Puzzle == shown) return;
                 shown = State.Puzzle;
+                SetVisibleLayer(-1);
                 SetView(null); // 새 문제는 기본 시점에서 시작
-                Web.SetQuery(Web.Query(State)); // 새로고침해도 같은 문제, 주소로 공유(웹판과 같음)
+                if (ui == null || ui.CurrentScreen == UiScreen.Game) Web.SetQuery(Web.Query(State)); // 새로고침해도 같은 문제, 주소로 공유(웹판과 같음)
             };
             // WebGL에서 "?mode=normal&seed=1p0wp" 주소로 들어오면 그 문제로 시작한다.
             // shortcut: 점수는 게임을 끄면 사라진다, 점수 데이터베이스를 만들 때 여기서 불러오고 저장할 것
@@ -109,6 +129,9 @@ namespace PentaBrick.View
 
         private void Rebuild()
         {
+            // 색·도구·점수 변경은 모형을 바꾸지 않는다. 불변 모형의 참조로 구별한다.
+            if (ReferenceEquals(drawnModel, State.Model)) return;
+            drawnModel = State.Model;
             if (blocks != null)
             {
                 blocks.gameObject.SetActive(false); // Destroy는 프레임 끝에 일어나므로 그 전에 클릭 판정에서 뺀다
@@ -127,7 +150,59 @@ namespace PentaBrick.View
                     var column = model.Column(x, z);
                     for (int y = 0; y < column.Count; y++) Cube(WorldPos(x, y, z), column[y]);
                 }
+            BuildCeiling();
             Physics.SyncTransforms(); // 새 블록의 충돌 위치를 바로 반영한다(안 하면 다음 물리 단계 전까지 클릭이 옛 위치에 맞을 수 있다)
+        }
+
+        // 상한선 색: 흐릿한 하늘색. 반투명 안내선 셰이더가 없으면(로드 실패) 블록 머티리얼에 어두운 색으로 대신한다.
+        private static readonly Color GuideColor = new Color(0.55f, 0.82f, 0.92f, 0.22f);
+        private static readonly Color GuideFallbackColor = new Color(0.2f, 0.32f, 0.4f, 1);
+        private const float DashLength = 0.14f, DashGap = 0.11f, DashWidth = 0.016f;
+        private Material guideMaterial;
+
+        /// <summary>
+        /// 쌓을 수 있는 최대 높이를 보여 주는 상자 테두리. 반투명 점선이라 블록을 가리지 않고, 충돌체가 없어 클릭도 통과한다.
+        /// </summary>
+        private void BuildCeiling()
+        {
+            if (ceiling != null && ceilingFor == State.Puzzle) return;
+            if (ceiling != null) Destroy(ceiling.gameObject);
+            ceilingFor = State.Puzzle;
+            ceiling = new GameObject("Height limit").transform;
+            ceiling.SetParent(transform);
+            if (guideMaterial == null)
+            {
+                var shader = Resources.Load<Shader>("GuideLine");
+                guideMaterial = shader != null && shader.isSupported ? new Material(shader) { name = "GuideLine" } : new Material(blockMaterial) { name = "GuideLine" };
+                guideMaterial.SetColor(BaseColor, shader != null && shader.isSupported ? GuideColor : GuideFallbackColor);
+            }
+            float half = State.Puzzle.Size / 2f, top = State.Puzzle.Height;
+            void Dashes(Vector3 from, Vector3 to)
+            {
+                Vector3 dir = (to - from).normalized;
+                float length = (to - from).magnitude;
+                for (float t = 0; t < length; t += DashLength + DashGap)
+                {
+                    float end = Mathf.Min(t + DashLength, length);
+                    var piece = GameObject.CreatePrimitive(PrimitiveType.Cube).transform;
+                    Destroy(piece.GetComponent<Collider>());
+                    var renderer = piece.GetComponent<Renderer>();
+                    renderer.sharedMaterial = guideMaterial;
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    renderer.receiveShadows = false;
+                    piece.SetParent(ceiling);
+                    piece.position = from + dir * ((t + end) / 2);
+                    Vector3 size = dir * (end - t);
+                    piece.localScale = new Vector3(Mathf.Max(DashWidth, Mathf.Abs(size.x)), Mathf.Max(DashWidth, Mathf.Abs(size.y)), Mathf.Max(DashWidth, Mathf.Abs(size.z)));
+                }
+            }
+            Vector3[] corners = { new Vector3(-half, 0, -half), new Vector3(half, 0, -half), new Vector3(half, 0, half), new Vector3(-half, 0, half) };
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 a = corners[i], b = corners[(i + 1) % 4];
+                Dashes(a + Vector3.up * top, b + Vector3.up * top); // 상한선
+                Dashes(a, a + Vector3.up * top);                   // 모서리 기둥
+            }
         }
 
         private Transform Cube(Vector3 pos, int color)
@@ -138,6 +213,7 @@ namespace PentaBrick.View
             cube.position = pos;
             cube.localScale = Vector3.one * 0.96f; // 블록 사이에 틈이 보이게
             Paint(cube, color);
+            ApplyLayer(cube);
             return cube;
         }
 
@@ -163,13 +239,53 @@ namespace PentaBrick.View
         private void LateUpdate()
         {
             var rotation = Quaternion.Euler(pitch, yaw, 0);
-            var target = new Vector3(0, State.Puzzle.Height / 2f, 0);
-            cam.transform.SetPositionAndRotation(target - rotation * Vector3.forward * distance, rotation);
+            var target = new Vector3(0, State.Puzzle.Height * 0.28f, 0);
+            float framedDistance = distance * Mathf.Max(1f, 0.72f / cam.aspect);
+            cam.transform.SetPositionAndRotation(target - rotation * Vector3.forward * framedDistance, rotation);
+            cam.rect = new Rect(0, 0, 1, 1);
+            if (backdrop != null)
+            {
+                float depth = cam.farClipPlane - 10;
+                float height = 2 * depth * Mathf.Tan(cam.fieldOfView * Mathf.Deg2Rad / 2);
+                backdrop.transform.localPosition = new Vector3(0, 0, depth);
+                backdrop.transform.localScale = new Vector3(height * cam.aspect * 1.05f, height * 1.05f, 1);
+            }
         }
 
         // ---------------------------------------------------------------
         // 입력
         // ---------------------------------------------------------------
+
+        /// <summary>선택한 층의 블록만 표시한다. 모형·개수·평면도·편집 기록은 유지한다.</summary>
+        public void SetVisibleLayer(int layer)
+        {
+            VisibleLayer = layer < 0 ? -1 : Mathf.Clamp(layer, 0, State.Puzzle.Height - 1);
+            if (blocks != null) foreach (Transform cube in blocks) ApplyLayer(cube);
+            if (ghost != null) ghost.gameObject.SetActive(false);
+        }
+
+        private void ApplyLayer(Transform cube)
+        {
+            int layer = CellOf(cube.position).y;
+            // 바닥 격자는 좌표와 클릭 기준으로 남기고, 다른 층의 블록만 숨긴다.
+            bool visible = layer < 0 || VisibleLayer < 0 || layer == VisibleLayer;
+            cube.GetComponent<Renderer>().enabled = visible;
+            cube.GetComponent<Collider>().enabled = visible;
+        }
+
+        private void OnDestroy()
+        {
+            if (backdrop != null) Destroy(backdrop);
+            if (backdropMaterial != null) Destroy(backdropMaterial);
+            if (guideMaterial != null) Destroy(guideMaterial);
+        }
+
+        private void OnDisable()
+        {
+            if (ghost != null) ghost.gameObject.SetActive(false);
+            pressedOnScene = dragging = false;
+            pinchSpan = 0;
+        }
 
         private void Update()
         {
@@ -215,13 +331,14 @@ namespace PentaBrick.View
             }
 
             RaycastHit hit = default;
-            bool hasHit = !overUi && Physics.Raycast(cam.ScreenPointToRay(pos), out hit);
+            bool hasHit = !overUi && Physics.Raycast(cam.ScreenPointToRay(pos), out hit)
+                && hit.transform.IsChildOf(blocks);
             Vector3Int cell = hasHit ? CellOf(hit.transform.position) : default;
 
             // 미리보기: 놓기 도구일 때 블록이 놓일 자리
             int top = hasHit ? State.Model.Column(cell.x, cell.z).Count : 0;
             bool canPlace = hasHit && !dragging && State.Phase == Phase.Playing && State.Tool == Tool.Place
-                && State.Remaining(State.Color) > 0 && top < State.Puzzle.Height
+                && State.HasBlocksLeft && top < State.Puzzle.Height && (VisibleLayer < 0 || top == VisibleLayer)
                 && (!touch || (pointer.press.isPressed && pressedOnScene)); // 터치는 마우스 올리기가 없어 누르는 동안만
             ghost.gameObject.SetActive(canPlace);
             if (canPlace)
@@ -237,10 +354,18 @@ namespace PentaBrick.View
             }
             else if (pointer.press.wasReleasedThisFrame && !dragging && pressedOnScene)
             {
-                if (State.Tool == Tool.Place) State.Place(cell.x, cell.z);
-                else if (State.Tool == Tool.Paint) State.Paint(cell.x, cell.y, cell.z);
+                if (State.Tool == Tool.Place) TryPlace(cell, top);
                 else State.Erase(cell.x, cell.y, cell.z);
             }
+        }
+
+        /// <summary>놓기. 높이 제한이나 블록 수 때문에 놓을 수 없으면 경고 문구를 띄운다.</summary>
+        private void TryPlace(Vector3Int cell, int top)
+        {
+            if (State.Phase != Phase.Playing || (VisibleLayer >= 0 && top != VisibleLayer)) return;
+            if (top >= State.Puzzle.Height) ui?.Notice($"높이 제한: {State.Puzzle.Height}층까지만 쌓을 수 있어요");
+            else if (!State.HasBlocksLeft) ui?.Notice($"블록 {State.RequiredTotal}개를 모두 놓았어요");
+            else State.Place(cell.x, cell.z);
         }
 
         /// <summary>두 손가락 핀치로 확대·축소한다. 두 손가락이 닿아 있으면 true.</summary>
@@ -272,15 +397,13 @@ namespace PentaBrick.View
             // 단축키도 같은 버튼을 누른 것처럼 소리를 낸다. 그 버튼이 비활성일 때(없는 색, 되돌릴 것 없음)는 내지 않는다.
             bool pressed = false;
             for (int i = 0; i < Colors.Count; i++)
-                if (kb[Key.Digit1 + i].wasPressedThisFrame)
-                {
-                    pressed |= State.Puzzle.Counts[i + 1] > 0;
-                    State.SetColor(i + 1);
-                }
+                if (kb[Key.Digit1 + i].wasPressedThisFrame) pressed |= State.SetColorSlot(i + 1); // 문제의 색 순서대로 1번부터
 
             if (kb.qKey.wasPressedThisFrame) { pressed = true; State.SetTool(Tool.Place); }
-            if (kb.wKey.wasPressedThisFrame) { pressed = true; State.SetTool(Tool.Paint); }
             if (kb.eKey.wasPressedThisFrame) { pressed = true; State.SetTool(Tool.Erase); }
+
+            if (kb.rKey.wasPressedThisFrame && State.Phase == Phase.Playing && State.UsedTotal > 0)
+                ui?.RequestBoardReset();
 
             bool command = kb.ctrlKey.isPressed || kb.leftCommandKey.isPressed || kb.rightCommandKey.isPressed;
             if (command && kb.zKey.wasPressedThisFrame)

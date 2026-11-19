@@ -22,3 +22,21 @@ Button:active:enabled {
     -unity-background-image-tint-color: rgba(255, 255, 255, 0.22);
     transition-duration: 0.05s;
 }
+
+/* 키보드·게임패드 탐색에서도 현재 버튼을 구분한다. */
+Button:focus {
+    border-left-color: rgb(97, 216, 232);
+    border-right-color: rgb(97, 216, 232);
+    border-top-color: rgb(97, 216, 232);
+    border-bottom-color: rgb(97, 216, 232);
+    -unity-background-image-tint-color: rgba(255, 255, 255, 0.15);
+}
+
+.game-title { text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5); }
+.tactile { transition-property: translate, scale, -unity-background-image-tint-color; transition-duration: 0.13s; }
+.mouse .tactile:hover:enabled { translate: 0 -2px; scale: 1.03 1.03; }
+.tactile:active:enabled { translate: 0 1px; scale: 0.97 0.97; transition-duration: 0.05s; }
+.slot-selected { translate: 0 -2px; }
+.arcade-submit { font-size: 17px; }
+.mouse .arcade-submit:hover:enabled { scale: 1.05 1.05; }
+.blueprint-card { transition-property: scale, -unity-background-image-tint-color; transition-duration: 0.15s; }

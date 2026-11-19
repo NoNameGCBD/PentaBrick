@@ -14,10 +14,10 @@ namespace PentaBrick.Tests
             var expected = new[]
             {
                 ("p1", 3, 7, true), ("p2", 3, 12, true), ("p3", 3, 8, false),
-                ("p4", 4, 18, true), ("p5", 3, 6, false), ("p6", 4, 22, true),
+                ("p4", 4, 18, true), ("p5", 3, 7, false), ("p6", 4, 22, true),
             };
             var actual = SamplePuzzles.All
-                .Select(p => (p.Id, p.Size, p.Counts.Sum(), p.Solvable)).ToArray();
+                .Select(p => (p.Id, p.Size, p.Total, p.Solvable)).ToArray();
             CollectionAssert.AreEqual(expected, actual);
             Assert.IsTrue(SamplePuzzles.All.All(p => p.Height == p.Size));
         }

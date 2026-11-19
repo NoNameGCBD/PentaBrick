@@ -15,7 +15,7 @@ namespace PentaBrick.Core
     ///
     /// 원리: 칸마다 기둥 높이만 정하면 어느 블록이 어느 방향에서 보이는지가 모두 정해진다.
     ///   보이는 블록의 색은 평면도가 정해 주고(두 평면도가 다른 색을 요구하면 모순),
-    ///   어느 방향에서도 안 보이는 블록은 남은 색을 아무렇게나 채우면 된다.
+    ///   어느 방향에서도 안 보이는 블록은 문제의 색 중 아무 색으로 채우면 된다(색별 개수는 자유, 총수만 맞춘다).
     ///   그래서 색은 탐색하지 않고 높이만 탐색한다.
     ///
     /// 탐색 순서: 앞줄부터 뒷줄로, 줄 안에서는 오른쪽부터 왼쪽으로.
@@ -37,10 +37,10 @@ namespace PentaBrick.Core
         {
             private readonly int n, h, total;
             private readonly int[,] top, front, back, left, right;
-            private readonly int[] counts;
+            private readonly bool[] palette = new bool[Colors.Count + 1];
+            private readonly int filler; // 안 보이는 블록에 칠할 색
             private readonly int[] heights;              // [z * n + x]
             private readonly int[] forced;               // [(z * n + x) * h + y] 평면도가 정해 준 색, 0이면 아직 자유
-            private readonly int[] forcedCount = new int[Colors.Count + 1];
             private readonly Stack<int> trail = new Stack<int>(); // forced에 값을 넣은 순서(되돌리기용)
             private int cells;
             private int budget;
@@ -56,8 +56,12 @@ namespace PentaBrick.Core
                 back = puzzle.Views[(int)ViewDir.Back];
                 left = puzzle.Views[(int)ViewDir.Left];
                 right = puzzle.Views[(int)ViewDir.Right];
-                counts = puzzle.Counts;
-                foreach (int count in counts) total += count;
+                total = puzzle.Total;
+                for (int color = 1; color <= Colors.Count; color++)
+                {
+                    palette[color] = puzzle.HasColor(color);
+                    if (palette[color] && filler == 0) filler = color;
+                }
                 heights = new int[n * n];
                 forced = new int[n * n * h];
                 budget = nodeLimit;
@@ -89,9 +93,7 @@ namespace PentaBrick.Core
                     heights[z * n + x] = 0;
                     while (trail.Count > mark)
                     {
-                        int cell = trail.Pop();
-                        forcedCount[forced[cell]]--;
-                        forced[cell] = 0;
+                        forced[trail.Pop()] = 0;
                     }
                 }
                 return false;
@@ -138,26 +140,21 @@ namespace PentaBrick.Core
                 int cell = (z * n + x) * h + y;
                 if (forced[cell] == color) return true;
                 if (forced[cell] != 0) return false;                  // 다른 평면도가 다른 색을 요구
-                if (forcedCount[color] >= counts[color]) return false; // 그 색 블록이 모자람
+                if (!palette[color]) return false;                    // 문제에 없는 색
                 forced[cell] = color;
-                forcedCount[color]++;
                 trail.Push(cell);
                 return true;
             }
 
-            /// <summary>찾은 높이와 확정된 색으로 모형을 만든다. 안 보이는 블록은 남은 색으로 채운다.</summary>
+            /// <summary>찾은 높이와 확정된 색으로 모형을 만든다. 안 보이는 블록은 문제의 첫 색으로 채운다.</summary>
             public Model BuildSolution()
             {
-                var spare = new Stack<int>();
-                for (int color = 1; color <= Colors.Count; color++)
-                    for (int i = forcedCount[color]; i < counts[color]; i++) spare.Push(color);
-
                 var columns = new int[n * n][];
                 for (int i = 0; i < columns.Length; i++)
                 {
                     columns[i] = new int[heights[i]];
                     for (int y = 0; y < heights[i]; y++)
-                        columns[i][y] = forced[i * h + y] != 0 ? forced[i * h + y] : spare.Pop();
+                        columns[i][y] = forced[i * h + y] != 0 ? forced[i * h + y] : filler;
                 }
                 return Model.FromColumns(n, h, columns);
             }

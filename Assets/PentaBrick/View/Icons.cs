@@ -4,7 +4,7 @@ using UnityEngine.UIElements;
 
 namespace PentaBrick.View
 {
-    public enum Icon { Pause, Settings, Back, Code, Place, Paint, Erase, Undo, Redo, Camera, Restart, Link, Help, Home, Eye }
+    public enum Icon { Pause, Settings, Back, Code, Place, Erase, Undo, Redo, Camera, Restart, Link, Help, Home, Eye }
 
     /// <summary>
     /// 선 아이콘. WebGL에는 OS 글꼴이 없고 글꼴마다 기호가 다르므로 글자 대신 Painter2D로 그린다.
@@ -90,14 +90,6 @@ namespace PentaBrick.View
                     Line(P(0.5f, 0.22f), P(0.5f, 0.78f));
                     Line(P(0.22f, 0.5f), P(0.78f, 0.5f));
                     break;
-                case Icon.Paint: // 물방울
-                {
-                    var drop = new List<Vector2> { P(0.5f, 0.18f) };
-                    drop.AddRange(Arc(0.5f, 0.6f, 0.21f, -35, 215));
-                    drop.Add(P(0.5f, 0.18f));
-                    Line(drop.ToArray());
-                    break;
-                }
                 case Icon.Erase:
                     Line(P(0.28f, 0.28f), P(0.72f, 0.72f));
                     Line(P(0.72f, 0.28f), P(0.28f, 0.72f));

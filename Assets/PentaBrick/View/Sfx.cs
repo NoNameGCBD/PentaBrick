@@ -47,14 +47,26 @@ namespace PentaBrick.View
         {
             state = GetComponent<BlockEditor>().State;
             last = SoundCue.Snapshot.Of(state);
-            state.Changed += () =>
-            {
-                Sound sound = SoundCue.Pick(last, state);
-                last = SoundCue.Snapshot.Of(state);
-                if (sound == Sound.None) return;
-                source.PlayOneShot(clips[(int)sound]);
-                cueFrame = Time.frameCount;
-            };
+            state.Changed += OnStateChanged;
+        }
+
+        private void OnStateChanged()
+        {
+            Sound sound = SoundCue.Pick(last, state);
+            last = SoundCue.Snapshot.Of(state);
+            if (sound == Sound.None) return;
+            source.PlayOneShot(clips[(int)sound]);
+            cueFrame = Time.frameCount;
+        }
+
+        private void OnDestroy()
+        {
+            if (state != null) state.Changed -= OnStateChanged;
+            if (source != null) source.Stop();
+            if (clips != null) foreach (var clip in clips) if (clip != null) Destroy(clip);
+            if (introBlocks != null) foreach (var clip in introBlocks) if (clip != null) Destroy(clip);
+            if (introTitle != null) Destroy(introTitle);
+            if (click != null) Destroy(click);
         }
 
         /// <summary>버튼 소리. 그 버튼이 게임 효과음(실행 취소, 제출 등)을 냈으면 겹치지 않게 그것만 들린다.</summary>

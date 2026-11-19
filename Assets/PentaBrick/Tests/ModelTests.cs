@@ -30,24 +30,15 @@ namespace PentaBrick.Tests
         }
 
         [Test]
-        public void Remove는_위_블록을_아래로_내린다()
+        public void Remove는_그_블록과_위에_쌓인_블록을_모두_지운다()
         {
             var model = M("RGB ./. .", 3);
-            CollectionAssert.AreEqual(new[] { G, B }, model.Remove(0, 0, 0).Column(0, 0));
-            CollectionAssert.AreEqual(new[] { R, B }, model.Remove(0, 1, 0).Column(0, 0));
+            CollectionAssert.AreEqual(new int[0], model.Remove(0, 0, 0).Column(0, 0));
+            CollectionAssert.AreEqual(new[] { R }, model.Remove(0, 1, 0).Column(0, 0));
+            CollectionAssert.AreEqual(new[] { R, G }, model.Remove(0, 2, 0).Column(0, 0));
             Assert.IsNull(model.Remove(0, 3, 0));
             Assert.IsNull(model.Remove(1, 0, 0));
             CollectionAssert.AreEqual(new[] { R, G, B }, model.Column(0, 0), "원본이 바뀌면 안 됨");
-        }
-
-        [Test]
-        public void Paint는_한_블록의_색만_바꾼다()
-        {
-            var model = M("RGB ./. .", 3);
-            CollectionAssert.AreEqual(new[] { R, Y, B }, model.Paint(0, 1, 0, Y).Column(0, 0));
-            Assert.IsNull(model.Paint(0, 1, 0, G), "이미 같은 색");
-            Assert.IsNull(model.Paint(1, 0, 0, G), "블록 없음");
-            Assert.IsNull(model.Paint(0, 1, 0, 9), "잘못된 색");
         }
 
         [Test]
@@ -95,7 +86,6 @@ namespace PentaBrick.Tests
             Assert.AreEqual(Colors.Empty, model.CellAt(0, 0, 2));
             Assert.IsNull(model.Remove(-1, 0, 0));
             Assert.IsNull(model.Remove(0, -1, 0));
-            Assert.IsNull(model.Paint(5, 0, 5, G));
             Assert.IsFalse(model.InBounds(2, 0));
         }
 

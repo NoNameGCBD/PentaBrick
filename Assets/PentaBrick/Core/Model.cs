@@ -17,7 +17,7 @@ namespace PentaBrick.Core
     ///   자료구조 차원에서 지켜진다.
     ///
     /// 불변(immutable)
-    ///   Place / Remove / Paint 는 원본을 바꾸지 않고 새 모형을 돌려준다(실패하면 null).
+    ///   Place / Remove 는 원본을 바꾸지 않고 새 모형을 돌려준다(실패하면 null).
     ///   덕분에 실행 취소가 "이전 모형 객체를 보관"하는 것만으로 끝난다.
     /// </summary>
     public sealed class Model
@@ -142,7 +142,7 @@ namespace PentaBrick.Core
         }
 
         /// <summary>
-        /// 블록(x, y, z)을 제거한다. 그 위에 있던 블록들은 한 칸씩 내려온다.
+        /// 블록(x, y, z)과 그 위에 쌓인 블록을 모두 제거한다.
         /// 실패(null): 격자 밖, 그 높이에 블록이 없음.
         /// </summary>
         public Model Remove(int x, int y, int z)
@@ -150,19 +150,8 @@ namespace PentaBrick.Core
             if (!InBounds(x, z)) return null;
             var column = columns[z * Size + x];
             if (y < 0 || y >= column.Length) return null;
-            var next = new int[column.Length - 1];
-            for (int i = 0; i < next.Length; i++) next[i] = column[i < y ? i : i + 1];
-            return WithColumn(x, z, next);
-        }
-
-        /// <summary>블록(x, y, z)의 색을 바꾼다. 실패(null): 격자 밖, 잘못된 색, 블록 없음, 이미 같은 색.</summary>
-        public Model Paint(int x, int y, int z, int color)
-        {
-            if (!InBounds(x, z) || !Colors.IsColor(color)) return null;
-            var column = columns[z * Size + x];
-            if (y < 0 || y >= column.Length || column[y] == color) return null;
-            var next = (int[])column.Clone();
-            next[y] = color;
+            var next = new int[y];
+            Array.Copy(column, next, y);
             return WithColumn(x, z, next);
         }
 

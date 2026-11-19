@@ -17,6 +17,7 @@ namespace PentaBrick.EditorTools
         {
             // 압축(Brotli) 파일을 서버 설정 없이도 열 수 있게: 로컬 서버·GitHub Pages는 Content-Encoding 헤더를 붙여 주지 않는다.
             PlayerSettings.WebGL.decompressionFallback = true;
+            PlayerSettings.WebGL.template = "PROJECT:PentaBrick";
             Run(BuildTarget.WebGL, "Builds/WebGL");
         }
 

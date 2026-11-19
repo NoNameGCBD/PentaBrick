@@ -50,7 +50,7 @@ namespace PentaBrick.Tests
         public static bool HasSolution(Puzzle puzzle)
         {
             int n = puzzle.Size, h = puzzle.Height;
-            var remaining = (int[])puzzle.Counts.Clone();
+            int remaining = puzzle.Total; // 색별 개수는 자유, 총수만 맞춘다
             var columns = new int[n * n][];
             for (int i = 0; i < columns.Length; i++) columns[i] = new int[0];
             var top = puzzle.Views[(int)ViewDir.Top];
@@ -65,7 +65,7 @@ namespace PentaBrick.Tests
             {
                 if (index == n * n)
                 {
-                    foreach (int count in remaining) if (count != 0) return false;
+                    if (remaining != 0) return false;
                     return Judge.Check(Model.FromColumns(n, h, columns), puzzle).Correct;
                 }
                 int x = index % n, z = index / n;
@@ -78,21 +78,21 @@ namespace PentaBrick.Tests
                 // stack: 꼭대기 아래에 깔리는 블록들. 꼭대기를 얹어 보거나, 한 칸 더 깐다.
                 bool Grow(int[] stack)
                 {
-                    if (stack.Length < limit && remaining[topColor] > 0)
+                    if (stack.Length < limit && remaining > 0 && puzzle.HasColor(topColor))
                     {
-                        remaining[topColor]--;
+                        remaining--;
                         columns[index] = Append(stack, topColor);
                         if (Fill(index + 1)) return true;
-                        remaining[topColor]++;
+                        remaining++;
                     }
                     if (stack.Length + 1 < limit)
                     {
                         for (int color = 1; color <= Colors.Count; color++)
                         {
-                            if (remaining[color] == 0) continue;
-                            remaining[color]--;
+                            if (remaining == 0 || !puzzle.HasColor(color)) continue;
+                            remaining--;
                             if (Grow(Append(stack, color))) return true;
-                            remaining[color]++;
+                            remaining++;
                         }
                     }
                     return false;

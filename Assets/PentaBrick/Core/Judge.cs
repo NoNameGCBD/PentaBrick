@@ -12,7 +12,7 @@ namespace PentaBrick.Core
         /// </summary>
         public bool[] ViewMatches { get; }
 
-        /// <summary>색별 블록 수가 문제와 정확히 같은지.</summary>
+        /// <summary>쓴 블록의 총수가 문제의 총수와 같은지(색별 개수는 보지 않는다).</summary>
         public bool CountsMatch { get; }
 
         /// <summary>점수 변동. Judge.Check만 했을 때는 0.</summary>
@@ -31,11 +31,11 @@ namespace PentaBrick.Core
     /// 정답 판정과 점수. (명세서 2.2, 규칙 4·5)
     ///
     /// 정답 모형과 직접 비교하지 않는다. 같은 평면도를 만드는 모형이 여러 개일 수 있으므로
-    /// "다섯 평면도가 모두 일치" + "색별 블록 수를 정확히 사용" 두 조건만 검사한다.
+    /// "다섯 평면도가 모두 일치" + "블록 총수를 정확히 사용" 두 조건만 검사한다. 색별 개수는 자유다.
     /// </summary>
     public static class Judge
     {
-        public const int SubmitPoints = 1;     // 규칙 4: 정답 +1, 오답 -1
+        public const int SubmitPoints = 1;     // 규칙 4: 정답 +1, 오답은 감점 없이 다시 도전
         public const int ImpossiblePoints = 2; // 규칙 5: 맞으면 +2, 틀리면 -2
 
         /// <summary>모형을 문제와 대조한다(점수 변동 없음). 크기가 다른 모형은 오답이다.</summary>
@@ -62,13 +62,9 @@ namespace PentaBrick.Core
                 allViews &= viewMatches[i];
             }
 
-            var used = model.CountColors();
-            bool countsMatch = true;
-            for (int color = 0; color < used.Length; color++)
-                if (used[color] != puzzle.Counts[color]) countsMatch = false;
-
+            bool countsMatch = model.TotalBlocks == puzzle.Total;
             bool correct = allViews && countsMatch;
-            return new JudgeResult(correct, viewMatches, countsMatch, correct ? points : -points);
+            return new JudgeResult(correct, viewMatches, countsMatch, correct ? points : 0);
         }
     }
 }
