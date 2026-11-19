@@ -311,6 +311,15 @@ namespace PentaBrick.PlayTests
             Assert.IsNull(root.Q("tray"), "메인 화면에는 게임 트레이가 없다");
             Assert.AreEqual(0, Live<Label>().Where(l => l.text.StartsWith("평면도와 블록 수를")).ToList().Count, "규칙 요약 없음");
             Assert.AreEqual(ByName<VisualElement>("main-play").resolvedStyle.width, ByName<VisualElement>("main-tutorial").resolvedStyle.width, 0.5f, "플레이와 튜토리얼은 같은 크기");
+            ui.Show(UiScreen.Main); // 같은 화면이면 등장 효과를 다시 하지 않는다
+            yield return null;
+            var title = Live<Label>().Where(l => l.text == "PENTA BRICK").First();
+            var blocks = ByName<VisualElement>("brand-blocks");
+            Assert.AreEqual(5, blocks.childCount, "다섯 색 블록");
+            yield return new WaitForSecondsRealtime(2f); // 블록이 튀어나온 뒤 제목이 튀어나온다
+            Assert.AreEqual(1f, title.resolvedStyle.opacity, 0.01f, "등장 효과가 끝나면 제목이 보인다");
+            Assert.AreEqual(1f, title.resolvedStyle.scale.value.x, 0.01f, "제목은 원래 크기로 돌아온다");
+            for (int i = 0; i < blocks.childCount; i++) Assert.AreEqual(1f, blocks[i].resolvedStyle.scale.value.x, 0.01f, "블록은 원래 크기로 돌아온다");
             yield return Save("ui-main.png");
 
             yield return ClickName("main-play");
@@ -757,7 +766,9 @@ namespace PentaBrick.PlayTests
             Assert.Greater(ByName<VisualElement>("mode-normal").worldBound.y, ByName<VisualElement>("mode-easy").worldBound.y + 1, "2×2: 보통은 다음 줄");
             yield return Save("ui-portrait-mode.png");
             ui.Show(UiScreen.Main);
-            yield return null;
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Save("ui-main-pop.png"); // 블록이 튀어나오는 중
+            yield return new WaitForSecondsRealtime(1.5f);
             yield return Save("ui-portrait-main.png");
         }
 

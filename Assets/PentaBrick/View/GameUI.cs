@@ -393,6 +393,7 @@ namespace PentaBrick.View
         public void Show(UiScreen screen)
         {
             if (screen == UiScreen.Intro) { introStart = Time.unscaledTime; introPrev = -1; }
+            if (screen == UiScreen.Main && CurrentScreen != UiScreen.Main) mainStart = Time.unscaledTime; // 메인에 들어올 때마다 등장 효과
             if (screen != UiScreen.Game) EndTutorial();
             CurrentScreen = screen;
             // 주소의 ?mode=&seed=는 게임 화면에서만 둔다. 메인 등으로 나간 뒤 새로고침하면 그 문제로 되돌아가지 않는다.
@@ -460,6 +461,7 @@ namespace PentaBrick.View
             }
             else if (screenCover != null) Animate();
             if (CurrentScreen == UiScreen.Intro) UpdateIntro();
+            if (CurrentScreen == UiScreen.Main && Time.unscaledTime - mainStart < MainPopEnd) UpdateMainPop();
             if (CurrentScreen != UiScreen.Game) return;
             UpdateNotice();
             int seconds = (int)(state.ElapsedMs / 1000);

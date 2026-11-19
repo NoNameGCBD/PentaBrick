@@ -177,18 +177,21 @@ namespace PentaBrick.View
 #endif
         }
 
-        /// <summary>메인 화면: 제목, 플레이, 튜토리얼. 설정은 오른쪽 위.</summary>
+        /// <summary>메인 화면: 튀어나오는 블록과 제목, 플레이, 튜토리얼. 설정은 오른쪽 위.</summary>
         private void BuildMain()
         {
             var page = Page();
             IconButton(Corner(page, true), "main-settings", Icon.Settings, "설정", OpenSettings);
-            BuildBrandPuzzle(page);
-            Text(page, "FIVE VIEWS. ONE SOLUTION.", 11, true, SelectColor).style.letterSpacing = 3;
+            BuildBrandBlocks(page);
+            mainTagline = Text(page, "FIVE VIEWS. ONE SOLUTION.", 11, true, SelectColor);
+            mainTagline.style.letterSpacing = 3;
             var title = Text(page, "PENTA BRICK", portrait ? 44 : 64, true);
             UseFont(title, "Fredoka-Static");
             title.AddToClassList("game-title");
             title.style.marginBottom = 4;
-            Text(page, "다섯 시선을 하나의 모형으로.", 16, false, DimColor).style.marginBottom = 28;
+            mainTitle = title;
+            mainSubtitle = Text(page, "다섯 시선을 하나의 모형으로.", 16, false, DimColor);
+            mainSubtitle.style.marginBottom = 28;
             var play = BigButton(page, "플레이", "", () => Show(UiScreen.DifficultySelect));
             play.name = "main-play";
             play.style.backgroundColor = SelectColor;
@@ -196,6 +199,7 @@ namespace PentaBrick.View
             BigButton(page, "튜토리얼", "", StartTutorial).name = "main-tutorial";
             if (state.Score != 0) Text(page, $"★ {state.Score}", 15, true, DimColor).style.marginTop = 18;
             Text(page, "관찰하고 · 추론하고 · 쌓아보세요", 11, false, DimColor).style.marginTop = 22;
+            UpdateMainPop(); // 다시 그려도 등장 효과가 진행 중이던 모습에서 이어진다
         }
 
         /// <summary>모드 선택: 타일 네 개. 뒤로는 왼쪽 위, 문제 코드는 오른쪽 위 작은 창.</summary>

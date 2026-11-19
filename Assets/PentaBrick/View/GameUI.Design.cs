@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PentaBrick.Core;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -42,27 +43,67 @@ namespace PentaBrick.View
             }
         }
 
-        private void BuildBrandPuzzle(VisualElement page)
+        // --- 메인 화면 등장 효과: 다섯 블록이 차례로 튀어나오고, 이어서 게임 이름이 튀어나온다 ---
+        private float mainStart = -10f; // 메인 화면에 들어온 시각. 창이 열려 화면을 다시 그려도 처음부터 다시 하지 않는다
+        private readonly List<VisualElement> mainBlocks = new List<VisualElement>();
+        private VisualElement mainTitle, mainTagline, mainSubtitle;
+        private const float PopDelay = 0.15f, PopGap = 0.09f, PopTime = 0.45f, TitlePop = 0.55f; // 초
+        private float TitleStart => PopDelay + (mainBlocks.Count - 1) * PopGap + PopTime * 0.6f;
+        private float MainPopEnd => TitleStart + TitlePop + 0.5f;
+
+        /// <summary>메인 화면 위쪽의 다섯 색 블록(가운데가 가장 높은 계단).</summary>
+        private void BuildBrandBlocks(VisualElement page)
         {
-            var emblem = Row(page);
-            emblem.name = "brand-puzzle";
-            emblem.style.alignItems = Align.Center;
-            emblem.style.marginBottom = 24;
-            // 첫 샘플의 실제 평면도로 게임의 규칙을 시각화한다.
-            var views = SamplePuzzles.All[0].Views;
-            for (int i = 0; i < 3; i++)
+            var row = Row(page);
+            row.name = "brand-blocks";
+            row.style.alignItems = Align.FlexEnd;
+            row.style.marginBottom = 26;
+            mainBlocks.Clear();
+            int size = portrait ? 34 : 42;
+            for (int i = 0; i < 5; i++)
             {
-                var tile = new VisualElement { pickingMode = PickingMode.Ignore };
-                tile.style.paddingLeft = tile.style.paddingRight = tile.style.paddingTop = tile.style.paddingBottom = 9;
-                tile.style.marginLeft = tile.style.marginRight = 5;
-                tile.style.backgroundColor = CardColor;
-                Round(tile, 12);
-                Border(tile, i == 1 ? SelectColor : LineColor, 1);
-                if (i != 1) tile.style.translate = new Translate(0, 10);
-                emblem.Add(tile);
-                Grid(tile, null, views[i], i == 1 ? 24 : 19);
+                Color color = ColorValues[i + 1];
+                var block = new VisualElement { pickingMode = PickingMode.Ignore };
+                block.style.width = block.style.height = size;
+                block.style.marginLeft = block.style.marginRight = portrait ? 4 : 6;
+                block.style.marginBottom = (2 - Mathf.Abs(i - 2)) * size * 0.25f;
+                block.style.backgroundColor = color;
+                Round(block, 8);
+                // 윗면은 밝게, 아랫면은 어둡게 해서 입체감을 준다.
+                block.style.borderTopWidth = 3;
+                block.style.borderTopColor = Color.Lerp(color, Color.white, 0.45f);
+                block.style.borderBottomWidth = 6;
+                block.style.borderBottomColor = Color.Lerp(color, Color.black, 0.4f);
+                row.Add(block);
+                mainBlocks.Add(block);
             }
         }
 
+        /// <summary>등장 효과의 현재 모습을 적용한다. 끝난 뒤에는 최종 모습 그대로다.</summary>
+        private void UpdateMainPop()
+        {
+            if (mainTitle == null) return;
+            float t = Time.unscaledTime - mainStart;
+            for (int i = 0; i < mainBlocks.Count; i++)
+            {
+                float p = Mathf.Clamp01((t - PopDelay - i * PopGap) / PopTime);
+                var block = mainBlocks[i];
+                block.style.opacity = Mathf.Clamp01(p * 4);
+                block.style.scale = new Scale(Vector2.one * Mathf.Max(0f, BackOut(p, 2.6f)));
+                block.style.translate = new Translate(0, 22 * (1 - p));
+            }
+            float q = Mathf.Clamp01((t - TitleStart) / TitlePop);
+            mainTitle.style.opacity = Mathf.Clamp01(q * 3);
+            mainTitle.style.scale = new Scale(Vector2.one * Mathf.LerpUnclamped(0.4f, 1f, BackOut(q, 2.2f)));
+            float fade = Mathf.Clamp01((t - TitleStart - TitlePop * 0.5f) / 0.4f);
+            mainTagline.style.opacity = mainSubtitle.style.opacity = fade;
+        }
+
+        /// <summary>목표를 살짝 지나쳤다가 돌아오는 움직임(0 → 1). overshoot가 클수록 더 튄다.</summary>
+        private static float BackOut(float p, float overshoot)
+        {
+            float x = p - 1;
+            return 1 + (overshoot + 1) * x * x * x + overshoot * x * x;
+        }
     }
 }
